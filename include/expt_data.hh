@@ -1,0 +1,9 @@
+extern int num_q;
+extern int num_q2;
+extern float q[113];
+extern float S_exp[113];
+extern float S_err[113];
+extern float dS_exp[113];
+extern float dS_err[113];
+extern int has_S_err;
+extern int has_dS_err;

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#data_path=data/Ala10_c5/
+data_path=data/1f6s_2/
+#data_path=data/Two_atoms/
+#data_path=data/2lao_2/
+#data_path=data/1lst_3
+#python input.py
+
+cp $data_path/*.cu src/
+cp $data_path/*.hh include/
