@@ -12,8 +12,9 @@ all coordinates (only).
 
 The calculation of scattering profile is the same as in FoXS but the form 
 factors are calculated explicitly. The solvation shell contrast coefficient is
-not uniform. It is with HyPred approach (radial sum of electron density
-difference up to vdW radii + 3 A). 
+currently set as adjustable just as in FoXS. 
+<!-- not uniform. It is with HyPred approach (radial sum of electron density
+difference up to vdW radii + 3 A). -->
 
 The atomic form factors in vacuum are calculated using Waasmaier-Kirfel table.
 
@@ -22,7 +23,7 @@ Crystallgr paper, which refers to Fraser 1978 J Appl Crystallgr paper and
 International Tables for X-ray Crystallography (1968). 
 
 In the surface area calculation part the spiral generating function is from 
-Guidance Navigation and Control Conference and Exhibit 1998 Bauer. 
+Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper. 
 
 The surface area calculation is done numerically following J Appl Crystallgr 
 1983 Connolly "Analytical Molecular Surface Calculation." Rasterized points 
@@ -33,16 +34,16 @@ be far enough from the vdW spheres of other atoms.
 ## Why use this program?
 
 1. It takes care of changing scattering intensity due to surface area
-   variation. This is necessary if you have an unfolding process to explore.
+   variation. This is necessary if you have an (un)folding process to explore.
    For example, a study focussing on molten globule state will benefit a lot.
 
-1. It is fast. If force is evaluated every 1000 steps, the computational
+1. It is fast. If force is evaluated every 50 steps, the computational
    overhead is almost negligible!
 
 1. Only one simulation box is required. You solvate the protein, equlibrate it,
    fit to the static scattering data, and then fit the difference data.
 
-1. It is compatible with some enhanced sampling methods such as  metadynamics.
+1. It is compatible with some enhanced sampling methods such as metadynamics.
    This again comes in handy when exploring the conformational space for an
    unfolding reaction, while the correction force keeps the structure from
    deviating from the difference signal. 
