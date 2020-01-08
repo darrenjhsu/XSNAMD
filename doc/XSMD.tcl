@@ -17,10 +17,11 @@ foreach atom $atoms {
     addatom $atom
 }
 
-
-# Take acceleration factors from NAMD config file, convert to kcal/(mol*Ang*amu)
 set PI 3.1415926535898
 set frame_num 0
+
+# In this section these commands e.g. float_array are from XSMD.i which is the
+# interface file in the /src/XSMD.i
 set p_coord [float_array [expr {$numatoms * 3}]]
 set p_force [float_array [expr {$numatoms * 3}]]
 set p_force_old [double_array [expr {$numatoms * 3}]]

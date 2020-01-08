@@ -56,7 +56,7 @@ fit: $(BUILDDIR)/fit_initial.o $(FITPARAMSOBJ) $(DATAPARAMSOBJ) $(DATA)/coord_re
 	@mkdir -p bin/$(DSET)
 	$(CC) $(GSLLIB) $^ $(LIB) -o bin/$(DSET)/fit_initial.out
 fit_traj: $(BUILDDIR)/fit_traj_initial.o $(FITTRAJPARAMSOBJ) $(DATAPARAMSOBJ) $(DATA)/expt_data.cu
-	@echo "Linking for fit ......"
+	@echo "Linking for fit trajectory ......"
 	@mkdir -p bin/$(DSET)
 	$(CC) $(GSLLIB) $^ $(LIB) -o bin/$(DSET)/fit_traj_initial.out
 $(BUILDDIR)/XSMD_wrap.o: $(SRCDIR)/XSMD_wrap.cxx
