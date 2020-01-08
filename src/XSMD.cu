@@ -10,7 +10,9 @@
 #include "WaasKirf.hh"
 #define PI 3.14159265359 
 
+
 void XSMD_calc (float *coord, float *Force, double *Force_old, double *S_old, int frame_num, double *EMA_norm, int restart) {
+// This function is called by tclforce script from NAMD. Note that it is only executed every delta_t steps.
 if (frame_num % delta_t == 0) {
     struct timeval tv1, tv2;
     gettimeofday(&tv1, NULL);
@@ -36,6 +38,7 @@ if (frame_num % delta_t == 0) {
     float *d_sigma2;         // Sigma square (standard error of mean) for the target diff pattern.
                                 
     float *d_Aq;             // Prefactor for each q
+
     //float *d_S_calc;         // Calculated scattering curve
     double *d_S_calc;         // For EMA method, use double
 
@@ -66,9 +69,6 @@ if (frame_num % delta_t == 0) {
 
 
     // Compute the exponential moving average normalization constant.
-    // Here this final 500.0 is to say we average over 500 snapshots,
-    // each snapshot taken every 1000 steps (the first if statement of this kernel).
-    // So we have tau = 1.0 ns for exponential averaging.
     double *d_S_old;
     *EMA_norm = *EMA_norm * exp(-(float)delta_t/(float)tau) + 1.0;
     printf("Currently EMA_Norm is %.3f\n",*EMA_norm);
@@ -106,7 +106,7 @@ if (frame_num % delta_t == 0) {
 
     // Allocate local memories
     //S_calc = (float *)malloc(size_q);
-    S_calc = (double *)malloc(size_double_q);
+    S_calc = (double *)malloc(size_double_q);  // If using EMA methods
 
     // Allocate cuda memories
     cudaMalloc((void **)&d_Aq,         size_q);
@@ -116,8 +116,10 @@ if (frame_num % delta_t == 0) {
     cudaMalloc((void **)&d_Ele,        size_atom);
     cudaMalloc((void **)&d_q_S_ref_dS, 3 * size_q);
     cudaMalloc((void **)&d_sigma2,     size_q);
-    //cudaMalloc((void **)&d_S_calc,     size_q); // Will be computed on GPU
+
+    //cudaMalloc((void **)&d_S_calc,     size_q);
     cudaMalloc((void **)&d_S_calc,     size_double_q); // For EMA method, use double precision
+
     cudaMalloc((void **)&d_f_ptxc,     size_qxatom2);
     cudaMalloc((void **)&d_f_ptyc,     size_qxatom2);
     cudaMalloc((void **)&d_f_ptzc,     size_qxatom2);
@@ -139,8 +141,10 @@ if (frame_num % delta_t == 0) {
     cudaMemset(d_close_flag, 0,   size_qxatom2);
     cudaMemset(d_Force,      0.0, size_coord);
     cudaMemset(d_Aq,         0.0, size_q);
+
     //cudaMemset(d_S_calc,     0.0, size_q);
     cudaMemset(d_S_calc,     0.0, size_double_q); //For EMA method, use double precision
+
     cudaMemset(d_f_ptxc,     0.0, size_qxatom2);
     cudaMemset(d_f_ptyc,     0.0, size_qxatom2);   
     cudaMemset(d_f_ptzc,     0.0, size_qxatom2);
@@ -165,7 +169,8 @@ if (frame_num % delta_t == 0) {
     //float sigma2 = 1.0;
     float alpha = 1.0;
     float offset = 0.2;
- 
+
+    // Register what atoms are close to what atoms. 
     dist_calc<<<1024, 1024>>>(
         d_coord, 
         d_close_num, 
@@ -182,6 +187,7 @@ if (frame_num % delta_t == 0) {
        exit(-1);
     }
 
+    // Based on the result list of d_close_idx, calculate surface area for each atom
     surf_calc<<<1024,512>>>(
         d_coord, 
         d_Ele, 
@@ -194,6 +200,8 @@ if (frame_num % delta_t == 0) {
         sol_s, 
         d_V);
 
+    // Also move the atom a bit (offset) to numerically calculate gradient of the surface area
+    // Not used as it does not change end result.
     /*surf_calc_surf_grad<<<1024,512>>>(
         d_coord, 
         d_Ele, 
@@ -216,6 +224,7 @@ if (frame_num % delta_t == 0) {
        exit(-1);
     }
 
+    // Sum up the surface area for this snapshot, not necessary but useful.
     sum_V<<<1,1024>>>(
         d_V, 
         d_V_s, 
@@ -232,6 +241,8 @@ if (frame_num % delta_t == 0) {
        exit(-1);
     }
 
+    // Calculate the non-varying part of the form factor.
+    // In the future this can be done pre-simulation.
     FF_calc<<<320, 32>>>(
         d_q_S_ref_dS, 
         d_WK, 
@@ -242,6 +253,8 @@ if (frame_num % delta_t == 0) {
         r_m, 
         d_FF_table,
         rho);
+
+    // If you're modeling each type of atom using the HyPred approach then this may be useful.
 /*
     create_FF_full_HyPred<<<320, 1024>>>(
         d_FF_table, 
@@ -255,6 +268,8 @@ if (frame_num % delta_t == 0) {
         num_atom, 
         num_atom2);
 */
+
+    // Adding the surface area contribution. From this point every atom has a different form factor.
     create_FF_full_FoXS<<<320, 1024>>>(
         d_FF_table, 
         d_V,
@@ -266,6 +281,8 @@ if (frame_num % delta_t == 0) {
         num_atom, 
         num_atom2);
 
+    // Adding the surface area contribution. From this point every atom has a different form factor.
+    // Also scale the surface gradient by c2.
 /*
     create_FF_full_FoXS_surf_grad<<<320, 1024>>>(
         d_FF_table, 
@@ -287,6 +304,8 @@ if (frame_num % delta_t == 0) {
        exit(-1);
     }
 
+    // Actually calculating scattering pattern. This kernel is for single snapshot - 
+    // the force is purely based on this one structure.
 /*    scat_calc<<<320, 1024>>>(
         d_coord, 
         d_Ele,
@@ -306,6 +325,8 @@ if (frame_num % delta_t == 0) {
         num_atom2, 
         d_FF_full);
 */
+
+    // Also consider surface gradient contribution.
 /*
     scat_calc_surf_grad<<<320, 1024>>>(
         d_coord, 
@@ -328,6 +349,7 @@ if (frame_num % delta_t == 0) {
         d_FF_full);
 */
 
+    // Calculate scattering pattern AND the exponential moving averaging scattering pattern that we use to derive force.
     scat_calc_EMA<<<320, 1024>>>(
         d_coord, 
         d_Ele,
@@ -362,6 +384,8 @@ if (frame_num % delta_t == 0) {
     //cudaMemcpyAsync(S_calc, d_S_calc, size_q,     cudaMemcpyDeviceToHost);
     cudaMemcpyAsync(S_calc, d_S_calc, size_double_q,     cudaMemcpyDeviceToHost);
 
+
+    // Calculate force.
     force_calc<<<1024, 512>>>(
         d_Force,
         num_atom, 
@@ -373,20 +397,7 @@ if (frame_num % delta_t == 0) {
         num_q2, 
         d_Ele,
         force_ramp);
-/*    force_calc_EMA<<<1024, 512>>>(
-        d_Force,
-        d_Force_old,
-        num_atom, 
-        num_q, 
-        d_f_ptxc, 
-        d_f_ptyc, 
-        d_f_ptzc, 
-        num_atom2, 
-        num_q2, 
-        d_Ele,
-        *EMA_norm,
-        force_ramp);
-*/
+
     cudaDeviceSynchronize();
     error = cudaGetLastError();
     if(error!=cudaSuccess)

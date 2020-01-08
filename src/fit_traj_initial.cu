@@ -420,7 +420,7 @@ int main () {
 
             // For every parameter
             
-            FILE *fpt = fopen("test.txt","r");
+            FILE *fpt = fopen("trajectory.txt","r");
             if (fpt == NULL) {
                 printf("Opening file failed.\n");
                 return 1;

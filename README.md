@@ -239,6 +239,52 @@ This is the ideal setting.
 
 Manuals coming ...
 
+
+## Important source files
+
+### `XSMD.cu`
+
+Contains a function which will be compiled into a .so shared object file. In
+this function kernels will be sequentially called to calculate solute surface
+area, scattering patterns, and forces that should be applied to the solute
+atoms.
+
+### `kernel.cu`
+
+Contains kernel functions that actually perform scattering calculations.
+
+### `XSMD.i`
+
+The interface file that goes along with SWIG, which enables tcl to call a C
+function. It also provides some helper functions such as declaring float arrays
+in C from tcl side.
+
+### `speedtest.cu`
+
+A file that looks like `XSMD.cu` but reads in coordinates from `coord.cu`. This
+allows you to test the functionality of these kernels (as well as do speed
+tests if you use nvprof in the HPC job submission.)
+
+### `mol_param.cu`
+
+Tells number of atoms and atom types. Atom types are defined in WaasKirf.cu and
+are used in the `FF_calc` kernel in `kernel.cu` 
+
+### `env_param.cu`
+
+Tells some environmental parameters such as k the spring constant (that is 
+inherited all the way from the initial `input.py`) or rho the solvent electron
+density (0.334 for water at 20 deg C). delta\_t and tau are defined in the
+paper.
+
+### `scat_param.cu`
+
+Contains number of q points, c1, c2, c, scattering patterns of the
+reference structure (or ensemble run), the difference pattern scaled to the
+scattering magnitude of reference signal, and error of the difference signal
+also scaled. Note that c is not used in the actual calculation. 
+
+
 <!--Of the files, 
 
 Init\_calc.cu       calculates with given two sets of coordinates, the scattering pattern for reference (S\_ref) and for initial (S\_init) structures, and then compute the difference (dS = S\_ref - S\_init)

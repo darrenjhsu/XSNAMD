@@ -10,7 +10,7 @@ float c2_H[10] = { 0.00000, -0.08428, -0.68250,  1.59535,  0.23293,  0.00000,
                    1.86771,  3.04298,  4.06575,  0.79196};
 float r_m = 1.62;
 float rho = 0.334;
-int delta_t = 10; // Frames, 1.0 ps.
-int tau = 1e4; // Frames, 50 ps.
+int delta_t = 50; // Frames, 1.0 ps.
+int tau = 5e3; // Frames, 50 ps.
 
 
