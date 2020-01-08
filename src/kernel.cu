@@ -3,11 +3,11 @@
 #include <math.h>
 #include <time.h>
 #include "env_param.hh"
-#include "scat_param.hh"
+//#include "scat_param.hh"
 #include "mol_param.hh"
 #include "WaasKirf.hh"
 #define PI 3.14159265359
-
+//#include <cuda_fp16.h>
 
 
 __global__ void dist_calc (
@@ -1011,7 +1011,7 @@ __global__ void __launch_bounds__(1024,2) scat_calc_bin (
     float *Aq, 
     float alpha,   
     float k_chi,    
-    float sigma2,
+    float *sigma2,
     float *f_ptxc, 
     float *f_ptyc, 
     float *f_ptzc, 
@@ -1030,14 +1030,24 @@ __global__ void __launch_bounds__(1024,2) scat_calc_bin (
     float q_pt; 
     //__shared__ float sqr[256];  // This is binned sin(q * r) / (q * r)
     //__shared__ float csqrr[256]; // This is binned (cos(q * r) - sin(q * r) / (q * r)) / r^2
-    __shared__ int q_a_r[1024];
+    __shared__ int q_a_r [1024];
     __shared__ int q_a_rx[1024];
     __shared__ int q_a_ry[1024];
     __shared__ int q_a_rz[1024];
+    /*__shared__ float q_a_r2 [1024];
+    __shared__ float q_a_rx2[1024];
+    __shared__ float q_a_ry2[1024];
+    __shared__ float q_a_rz2[1024];*/
  
     for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
 
         q_pt = q_S_ref_dS[ii];
+        for (int kk = threadIdx.x; kk < 1024; kk += blockDim.x) {
+            q_a_r [kk] = 0;
+            q_a_rx[kk] = 0;
+            q_a_ry[kk] = 0;
+            q_a_rz[kk] = 0;
+        }
         // Determine the sqr and csqrr
         /*for (int jj = threadIdx.x; jj < 256; jj += blockDim.x) {
             float r = (float)jj * 0.5 + 0.25;
@@ -1046,24 +1056,31 @@ __global__ void __launch_bounds__(1024,2) scat_calc_bin (
             float dsqr = cos(qr) - sqr[jj];
             csqrr[jj] =  dsqr / r / r;
         }*/
-        __syncthreads();
+        //__syncthreads();
         // Calculate scattering for Aq
         for (int jj = 0; jj < num_atom; jj ++) {
-            for (int kk = threadIdx.x; kk < 1024; kk += blockDim.x) {
+            /*for (int kk = threadIdx.x; kk < 1024; kk += blockDim.x) {
                 q_a_r [kk] = 0;
                 q_a_rx[kk] = 0;
                 q_a_ry[kk] = 0;
-                q_a_rz[kk] = 0;
-            }
-            __syncthreads();
+                q_a_rz[kk] = 0;*/
+                /*q_a_r2 [kk] = 0.0;
+                q_a_rx2[kk] = 0.0;
+                q_a_ry2[kk] = 0.0;
+                q_a_rz2[kk] = 0.0;*/
+            //}
+
+            //__syncthreads(); // This one is essential
             // for every atom jj
             float atom1x = coord[3*jj+0];
             float atom1y = coord[3*jj+1];
             float atom1z = coord[3*jj+2];
             float atom1FF = FF_full[ii*num_atom2 +jj];
+            //__syncthreads(); // This one is essential
             for (int kk = threadIdx.x; kk < num_atom; kk+= blockDim.x) {
                 // for every atom kk
-                float FF_kj = atom1FF * FF_full[ii *num_atom2 + kk];
+                //float FF_kj = atom1FF * FF_full[ii *num_atom2 + kk];
+                float FF_kj = FF_full[ii *num_atom2 + kk];
                 //if (q_pt == 0.0 || kk == jj) {
                 //    S_calccs += FF_kj;
                 //} else {
@@ -1071,26 +1088,36 @@ __global__ void __launch_bounds__(1024,2) scat_calc_bin (
                 float dy = coord[3*kk+1] - atom1y;
                 float dz = coord[3*kk+2] - atom1z;
                 float r = sqrt(dx*dx+dy*dy+dz*dz);
-                int idz = r * 2.0;
-                /*int ida = threadIdx.x / 256 * 256;
-                atomicAdd(&q_a_r [idz+ida], (int)(FF_kj * 1e6));
-                atomicAdd(&q_a_rx[idz+ida], (int)(2e6 * FF_kj * dx));
-                atomicAdd(&q_a_ry[idz+ida], (int)(2e6 * FF_kj * dy));
-                atomicAdd(&q_a_rz[idz+ida], (int)(2e6 * FF_kj * dz));*/
-                atomicAdd(&q_a_r [idz], (int)(FF_kj * 1e6));
-                atomicAdd(&q_a_rx[idz], (int)(2e6 * FF_kj * dx));
-                atomicAdd(&q_a_ry[idz], (int)(2e6 * FF_kj * dy));
-                atomicAdd(&q_a_rz[idz], (int)(2e6 * FF_kj * dz));
+                //if (r < 64) {
+                    int idz = r += r; // Because we're using 0.5 A bins.
+                    /*int ida = threadIdx.x / 256 * 256;
+                    atomicAdd(&q_a_r [idz+ida], (int)(FF_kj * 1e6));
+                    atomicAdd(&q_a_rx[idz+ida], (int)(2e6 * FF_kj * dx));
+                    atomicAdd(&q_a_ry[idz+ida], (int)(2e6 * FF_kj * dy));
+                    atomicAdd(&q_a_rz[idz+ida], (int)(2e6 * FF_kj * dz));*/
+                    int dumm = atom1FF * FF_kj * 1e4;
+                    atomicAdd(&q_a_r [idz], dumm);
+                    dumm = atom1FF * FF_kj * dx * 2e4;
+                    atomicAdd(&q_a_rx[idz], dumm);
+                    dumm = atom1FF * FF_kj * dy * 2e4;
+                    atomicAdd(&q_a_ry[idz], dumm);
+                    dumm = atom1FF * FF_kj * dz * 2e4;
+                    atomicAdd(&q_a_rz[idz], dumm);
 
-                    /*float qr = q_pt * r; 
-                    float sqr = sin(qr) / qr;
-                    float dsqr = cos(qr) - sqr;
-                    float prefac = FF_kj * dsqr / r / r;
-                    prefac += prefac;
-                    S_calccs += FF_kj * sqr;
-                    f_ptxcs += prefac * dx;
-                    f_ptycs += prefac * dy;
-                    f_ptzcs += prefac * dz;*/
+                    /*atomicAdd(&q_a_r [idz], (int)(FF_kj * 1e4));
+                    atomicAdd(&q_a_rx[idz], (int)(2e4 * FF_kj * dx));
+                    atomicAdd(&q_a_ry[idz], (int)(2e4 * FF_kj * dy));
+                    atomicAdd(&q_a_rz[idz], (int)(2e4 * FF_kj * dz));*/
+                        /*float qr = q_pt * r; 
+                        float sqr = sin(qr) / qr;
+                        float dsqr = cos(qr) - sqr;
+                        float prefac = FF_kj * dsqr / r / r;
+                        prefac += prefac;
+                        S_calccs += FF_kj * sqr;
+                        f_ptxcs += prefac * dx;
+                        f_ptycs += prefac * dy;
+                        f_ptzcs += prefac * dz;*/
+                    //}
                 //}
             }
 
@@ -1115,15 +1142,48 @@ __global__ void __launch_bounds__(1024,2) scat_calc_bin (
                 //atomicAdd(&f_ptxc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rx[kk] * csqrr[kk]));
                 //atomicAdd(&f_ptyc[ii*num_atom2+jj], (float)( 1e-6 * q_a_ry[kk] * csqrr[kk]));
                 //atomicAdd(&f_ptzc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rz[kk] * csqrr[kk]));
-                atomicAdd(&S_calcc[ii*num_atom2+jj],(float)( 1e-6 * q_a_r[kk]  *   sqr));
+                /*atomicAdd(&S_calcc[ii*num_atom2+jj],(float)( 1e-6 * q_a_r[kk]  *   sqr));
                 atomicAdd(&f_ptxc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rx[kk] * csqrr));
                 atomicAdd(&f_ptyc[ii*num_atom2+jj], (float)( 1e-6 * q_a_ry[kk] * csqrr));
-                atomicAdd(&f_ptzc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rz[kk] * csqrr));
+                atomicAdd(&f_ptzc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rz[kk] * csqrr));*/
+                /*q_a_r2[kk] = q_a_r[kk] * sqr;
+                q_a_rx2[kk] = q_a_rx[kk] * csqrr;
+                q_a_ry2[kk] = q_a_ry[kk] * csqrr;
+                q_a_rz2[kk] = q_a_rz[kk] * csqrr;*/
+                atomicAdd(&S_calcc[ii*num_atom2+jj],q_a_r[kk]  *   sqr);
+                q_a_r[kk] = 0;
+                atomicAdd(&f_ptxc[ii*num_atom2+jj], q_a_rx[kk] * csqrr);
+                q_a_rx[kk] = 0;
+                atomicAdd(&f_ptyc[ii*num_atom2+jj], q_a_ry[kk] * csqrr);
+                q_a_ry[kk] = 0;
+                atomicAdd(&f_ptzc[ii*num_atom2+jj], q_a_rz[kk] * csqrr);
+                q_a_rz[kk] = 0;
             }
             __syncthreads();
 
+            /*
+            for (int stride = 1024 / 2; stride > 0; stride >>= 1) {
+                __syncthreads();
+                for(int iAccum = threadIdx.x; iAccum < stride; iAccum += blockDim.x) {
+                    q_a_r2[iAccum] += q_a_r2[stride + iAccum];
+                    q_a_rx2[iAccum] += q_a_rx2[stride + iAccum];
+                    q_a_ry2[iAccum] += q_a_ry2[stride + iAccum];
+                    q_a_rz2[iAccum] += q_a_rz2[stride + iAccum];
+                }
+            }
+            //__syncthreads();
+            if (threadIdx.x == 0) {
+                S_calcc[ii*num_atom2+jj]+= q_a_r2[0] ;
+                f_ptxc [ii*num_atom2+jj]+= q_a_rx2[0];
+                f_ptyc [ii*num_atom2+jj]+= q_a_ry2[0];
+                f_ptzc [ii*num_atom2+jj]+= q_a_rz2[0];
+            }
+            */
+ 
         }
         
+        //if (ii == 0 && threadIdx.x == 0) printf("\nS_calcc[0] = %.3f \n",S_calcc[0]);
+
         // Tree-like summation of S_calcc to get S_calc
         for (int stride = num_atom2 / 2; stride > 0; stride >>= 1) {
             __syncthreads();
@@ -1133,23 +1193,627 @@ __global__ void __launch_bounds__(1024,2) scat_calc_bin (
         }
         __syncthreads();
         
-        S_calc[ii] = S_calcc[ii * num_atom2];
-        __syncthreads();
-        if (threadIdx.x == 0) {
+        //if (threadIdx.x == 0) {
+            S_calc[ii] = S_calcc[ii * num_atom2]*1e-4;
             Aq[ii] = S_calc[ii] - q_S_ref_dS[ii+num_q];
             Aq[ii] *= -alpha;
             Aq[ii] += q_S_ref_dS[ii + 2*num_q];
-            Aq[ii] *= k_chi / sigma2;
+            Aq[ii] *= k_chi / sigma2[ii];
             Aq[ii] += Aq[ii];
-        }
+        //}
         __syncthreads();
         for (int jj = threadIdx.x; jj < num_atom; jj += blockDim.x) {
-            f_ptxc[ii * num_atom2 + jj] *= Aq[ii] * alpha;
-            f_ptyc[ii * num_atom2 + jj] *= Aq[ii] * alpha;
-            f_ptzc[ii * num_atom2 + jj] *= Aq[ii] * alpha;
+            f_ptxc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+            f_ptyc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+            f_ptzc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
         }
     }
 }
+__global__ void __launch_bounds__(1024,2) scat_calc_bin_unroll (
+    float *coord, 
+    int *Ele,
+    float *q_S_ref_dS, 
+    float *S_calc, 
+    int num_atom,   
+    int num_q,     
+    int num_ele,   
+    float *Aq, 
+    float alpha,   
+    float k_chi,    
+    float *sigma2,
+    float *f_ptxc, 
+    float *f_ptyc, 
+    float *f_ptzc, 
+    float *S_calcc, 
+    int num_atom2,
+    float *FF_full   
+    ) { 
+
+    float q_pt; 
+    /*__shared__ int q_a_r [4][511];
+    __shared__ int q_a_rx[4][511];
+    __shared__ int q_a_ry[4][511];
+    __shared__ int q_a_rz[4][511];*/
+    /*__shared__ int q_a_r [1024];
+    __shared__ int q_a_rx[1024];
+    __shared__ int q_a_ry[1024];
+    __shared__ int q_a_rz[1024];
+    __shared__ int q_a_r2 [1024];
+    __shared__ int q_a_rx2[1024];
+    __shared__ int q_a_ry2[1024];
+    __shared__ int q_a_rz2[1024];*/
+    __shared__ int q_a_r [512];
+    __shared__ int q_a_rx[512];
+    __shared__ int q_a_ry[512];
+    __shared__ int q_a_rz[512];
+    __shared__ int q_a_r2 [512];
+    __shared__ int q_a_rx2[512];
+    __shared__ int q_a_ry2[512];
+    __shared__ int q_a_rz2[512];
+    /*__shared__ float atomx[4];
+    __shared__ float atomy[4];
+    __shared__ float atomz[4];
+    __shared__ float atomFF[4];*/
+    for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
+
+        q_pt = q_S_ref_dS[ii];
+        for (int kk = threadIdx.x; kk < 256; kk += blockDim.x) {
+            /*for (int ll = 0; ll < 4; ll++) {
+                q_a_r[ll][kk] = 0;
+                q_a_rx[ll][kk] = 0;
+                q_a_ry[ll][kk] = 0;
+                q_a_rz[ll][kk] = 0;
+            }*/
+            q_a_r [kk] = 0;
+            q_a_rx[kk] = 0;
+            q_a_ry[kk] = 0;
+            q_a_rz[kk] = 0;
+            q_a_r2 [kk] = 0;
+            q_a_rx2[kk] = 0;
+            q_a_ry2[kk] = 0;
+            q_a_rz2[kk] = 0;
+        }
+        for (int jj = 0; jj < num_atom; jj += 2) {
+            // for every atom jj
+            /*for (int kk = 0; kk < 4; kk++) {
+                atomx[kk] = coord[3*jj+3*kk+0];
+                atomy[kk] = coord[3*jj+3*kk+1];
+                atomz[kk] = coord[3*jj+3*kk+2];
+                atomFF[kk] = FF_full[ii*num_atom2 + jj + 3 * kk];
+            }*/
+            float atom1x = coord[3*jj+0];
+            float atom1y = coord[3*jj+1];
+            float atom1z = coord[3*jj+2];
+            float atom2x = coord[3*jj+3];
+            float atom2y = coord[3*jj+4];
+            float atom2z = coord[3*jj+5];
+            float atom1FF = FF_full[ii*num_atom2 +jj];
+            float atom2FF = FF_full[ii*num_atom2 + jj + 1];
+            for (int kk = threadIdx.x; kk < num_atom; kk+= blockDim.x) {
+                // for every atom kk
+                float FF_kj = FF_full[ii *num_atom2 + kk];
+                /*for (int ll = 0; ll < 4; ll++) {
+
+                    float dx = coord[3*kk+0] - atomx[ll];
+                    float dy = coord[3*kk+1] - atomy[ll];
+                    float dz = coord[3*kk+2] - atomz[ll];
+                    float r = sqrt(dx*dx+dy*dy+dz*dz);
+                    int idz = r += r; // Because we're using 0.5 A bins.
+                    int dumm = atomFF[ll] * FF_kj * 1e4;
+                    atomicAdd(&q_a_r [ll][idz], dumm);
+                    dumm = atomFF[ll] * FF_kj * dx * 2e4;
+                    atomicAdd(&q_a_rx[ll][idz], dumm);
+                    dumm = atomFF[ll] * FF_kj * dy * 2e4;
+                    atomicAdd(&q_a_ry[ll][idz], dumm);
+                    dumm = atomFF[ll] * FF_kj * dz * 2e4;
+                    atomicAdd(&q_a_rz[ll][idz], dumm);
+
+                }*/
+                float x = coord[3*kk+0];
+                float y = coord[3*kk+1];
+                float z = coord[3*kk+2];
+                float dx = x - atom1x;
+                float dy = y - atom1y;
+                float dz = z - atom1z;
+                /*float dx = coord[3*kk+0] - atom1x;
+                float dy = coord[3*kk+1] - atom1y;
+                float dz = coord[3*kk+2] - atom1z;*/
+                float r = sqrt(dx*dx+dy*dy+dz*dz);
+                int idz = r += r; // Because we're using 0.5 A bins.
+                //if (idz < 256) {
+                int dumm = atom1FF * FF_kj * 10000;
+                atomicAdd(&q_a_r [idz], dumm);
+                dumm = atom1FF * FF_kj * dx * 20000;
+                atomicAdd(&q_a_rx[idz], dumm);
+                dumm = atom1FF * FF_kj * dy * 20000;
+                atomicAdd(&q_a_ry[idz], dumm);
+                dumm = atom1FF * FF_kj * dz * 20000;
+                atomicAdd(&q_a_rz[idz], dumm);
+/*
+                // Try to avoid double mul
+                int dumm = atom1FF * 1e4;
+                dumm *= FF_kj;
+                atomicAdd(&q_a_r [idz], dumm);
+                dumm = dx * 2e4;
+                dumm *= atom1FF * FF_kj;
+                atomicAdd(&q_a_rx[idz], dumm);
+                dumm = dy * 2e4;
+                dumm *= atom1FF * FF_kj;
+                atomicAdd(&q_a_ry[idz], dumm);
+                dumm = dz * 2e4;
+                dumm *= atom1FF * FF_kj;
+                atomicAdd(&q_a_rz[idz], dumm);
+*/
+                //}
+                /*dx = coord[3*kk+0] - atom2x;
+                dy = coord[3*kk+1] - atom2y;
+                dz = coord[3*kk+2] - atom2z;*/
+                dx = x - atom2x;
+                dy = y - atom2y;
+                dz = z - atom2z;
+                r = sqrt(dx*dx+dy*dy+dz*dz);
+                idz = r += r; // Because we're using 0.5 A bins.
+                //if (idz < 256) {
+                //int dumm = atom2FF * FF_kj * 1e4;
+                dumm = atom2FF * FF_kj * 10000;
+                atomicAdd(&q_a_r2 [idz], dumm);
+                dumm = atom2FF * FF_kj * dx * 20000;
+                atomicAdd(&q_a_rx2[idz], dumm);
+                dumm = atom2FF * FF_kj * dy * 20000;
+                atomicAdd(&q_a_ry2[idz], dumm);
+                dumm = atom2FF * FF_kj * dz * 20000;
+                atomicAdd(&q_a_rz2[idz], dumm);
+
+                //}
+/*                dumm = atom1FF * 1e4;
+                dumm *= FF_kj;
+                atomicAdd(&q_a_r2 [idz], dumm);
+                dumm = dx * 2e4;
+                dumm *= atom1FF * FF_kj;
+                atomicAdd(&q_a_rx2[idz], dumm);
+                dumm = dy * 2e4;
+                dumm *= atom1FF * FF_kj;
+                atomicAdd(&q_a_ry2[idz], dumm);
+                dumm = dz * 2e4;
+                dumm *= atom1FF * FF_kj;
+                atomicAdd(&q_a_rz2[idz], dumm);*/
+            }
+
+            __syncthreads();
+
+            for (int kk = threadIdx.x; kk < 256; kk += blockDim.x) {
+                float r = (float)kk * 0.5 + 0.25;
+                float qr = q_pt * r;
+                float sqr = sin(qr) / qr;
+                float dsqr = cos(qr) - sqr;
+                float csqrr = dsqr / r / r;
+                /*for (int ll = 0; ll < 4; ll++) {
+                    atomicAdd(&S_calcc[ii*num_atom2+jj],q_a_r[ll][kk]  *   sqr);
+                    q_a_r[ll][kk] = 0;
+                    atomicAdd(&f_ptxc[ii*num_atom2+jj],q_a_rx[ll][kk]  *   csqrr);
+                    q_a_rx[ll][kk] = 0;
+                    atomicAdd(&f_ptyc[ii*num_atom2+jj],q_a_ry[ll][kk]  *   csqrr);
+                    q_a_ry[ll][kk] = 0;
+                    atomicAdd(&f_ptzc[ii*num_atom2+jj],q_a_rz[ll][kk]  *   csqrr);
+                    q_a_rz[ll][kk] = 0;
+                }*/
+                atomicAdd(&S_calcc[ii*num_atom2+jj],q_a_r[kk]  *   sqr);
+                atomicAdd(&S_calcc[ii*num_atom2+jj+1],q_a_r2[kk]  *   sqr);
+                q_a_r[kk] = 0;
+                q_a_r2[kk] = 0;
+                atomicAdd(&f_ptxc[ii*num_atom2+jj], q_a_rx[kk] * csqrr);
+                atomicAdd(&f_ptxc[ii*num_atom2+jj+1], q_a_rx2[kk] * csqrr);
+                q_a_rx[kk] = 0;
+                q_a_rx2[kk] = 0;
+                atomicAdd(&f_ptyc[ii*num_atom2+jj], q_a_ry[kk] * csqrr);
+                atomicAdd(&f_ptyc[ii*num_atom2+jj+1], q_a_ry2[kk] * csqrr);
+                q_a_ry[kk] = 0;
+                q_a_ry2[kk] = 0;
+                atomicAdd(&f_ptzc[ii*num_atom2+jj], q_a_rz[kk] * csqrr);
+                atomicAdd(&f_ptzc[ii*num_atom2+jj+1], q_a_rz2[kk] * csqrr);
+                q_a_rz[kk] = 0;
+                q_a_rz2[kk] = 0;
+            }
+            __syncthreads();
+
+            /*
+            for (int stride = 1024 / 2; stride > 0; stride >>= 1) {
+                __syncthreads();
+                for(int iAccum = threadIdx.x; iAccum < stride; iAccum += blockDim.x) {
+                    q_a_r2[iAccum] += q_a_r2[stride + iAccum];
+                    q_a_rx2[iAccum] += q_a_rx2[stride + iAccum];
+                    q_a_ry2[iAccum] += q_a_ry2[stride + iAccum];
+                    q_a_rz2[iAccum] += q_a_rz2[stride + iAccum];
+                }
+            }
+            //__syncthreads();
+            if (threadIdx.x == 0) {
+                S_calcc[ii*num_atom2+jj]+= q_a_r2[0] ;
+                f_ptxc [ii*num_atom2+jj]+= q_a_rx2[0];
+                f_ptyc [ii*num_atom2+jj]+= q_a_ry2[0];
+                f_ptzc [ii*num_atom2+jj]+= q_a_rz2[0];
+            }
+            */
+ 
+        }
+        
+        //if (ii == 0 && threadIdx.x == 0) printf("\nS_calcc[0] = %.3f \n",S_calcc[0]);
+
+        // Tree-like summation of S_calcc to get S_calc
+        for (int stride = num_atom2 / 2; stride > 0; stride >>= 1) {
+            __syncthreads();
+            for(int iAccum = threadIdx.x; iAccum < stride; iAccum += blockDim.x) {
+                S_calcc[ii * num_atom2 + iAccum] += S_calcc[ii * num_atom2 + stride + iAccum];
+            }
+        }
+        __syncthreads();
+        
+        //if (threadIdx.x == 0) {
+            S_calc[ii] = S_calcc[ii * num_atom2]*1e-4;
+            Aq[ii] = S_calc[ii] - q_S_ref_dS[ii+num_q];
+            Aq[ii] *= -alpha;
+            Aq[ii] += q_S_ref_dS[ii + 2*num_q];
+            Aq[ii] *= k_chi / sigma2[ii];
+            Aq[ii] += Aq[ii];
+        //}
+        __syncthreads();
+        for (int jj = threadIdx.x; jj < num_atom; jj += blockDim.x) {
+            f_ptxc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+            f_ptyc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+            f_ptzc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+        }
+    }
+}
+__global__ void __launch_bounds__(1024,2) scat_calc_bin_unroll2 (
+    float *coord, 
+    int *Ele,
+    float *q_S_ref_dS, 
+    float *S_calc, 
+    int num_atom,   
+    int num_q,     
+    int num_ele,   
+    float *Aq, 
+    float alpha,   
+    float k_chi,    
+    float *sigma2,
+    float *f_ptxc, 
+    float *f_ptyc, 
+    float *f_ptzc, 
+    float *S_calcc, 
+    int num_atom2,
+    float *FF_full   
+    ) { 
+
+    float q_pt; 
+    __shared__ int q_a_r [2048];
+    __shared__ int q_a_rx[2048];
+    __shared__ int q_a_ry[2048];
+    __shared__ int q_a_rz[2048];
+    for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
+
+        q_pt = q_S_ref_dS[ii];
+        for (int kk = threadIdx.x; kk < 2048; kk += blockDim.x) {
+            q_a_r[kk] = 0;
+            q_a_rx[kk] = 0;
+            q_a_ry[kk] = 0;
+            q_a_rz[kk] = 0;
+        }
+        for (int jj = 0; jj < num_atom; jj += 3) {
+            // for every atom jj
+            /*for (int kk = 0; kk < 4; kk++) {
+                atomx[kk] = coord[3*jj+3*kk+0];
+                atomy[kk] = coord[3*jj+3*kk+1];
+                atomz[kk] = coord[3*jj+3*kk+2];
+                atomFF[kk] = FF_full[ii*num_atom2 + jj + 3 * kk];
+            }*/
+            float atom1x = coord[3*jj+0];
+            float atom1y = coord[3*jj+1];
+            float atom1z = coord[3*jj+2];
+            float atom2x = coord[3*jj+3];
+            float atom2y = coord[3*jj+4];
+            float atom2z = coord[3*jj+5];
+            float atom3x = coord[3*jj+6];
+            float atom3y = coord[3*jj+7];
+            float atom3z = coord[3*jj+8];
+            //float atom4x = coord[3*jj+9];
+            //float atom4y = coord[3*jj+10];
+            //float atom4z = coord[3*jj+11];
+            float atom1FF = FF_full[ii*num_atom2 + jj];
+            float atom2FF = FF_full[ii*num_atom2 + jj + 1];
+            float atom3FF = FF_full[ii*num_atom2 + jj + 2];
+            //float atom4FF = FF_full[ii*num_atom2 + jj + 3];
+            for (int kk = threadIdx.x; kk < num_atom; kk+= blockDim.x) {
+                // for every atom kk
+                float FF_kj = FF_full[ii *num_atom2 + kk];
+                float x = coord[3*kk+0];
+                float y = coord[3*kk+1];
+                float z = coord[3*kk+2];
+                float dx = x - atom1x;
+                float dy = y - atom1y;
+                float dz = z - atom1z;
+                float r = sqrt(dx*dx+dy*dy+dz*dz);
+                int idz = r += r; // Because we're using 0.5 A bins.
+                int dumm = atom1FF * FF_kj * 10000;
+                atomicAdd(&q_a_r [idz], dumm);
+                dumm = atom1FF * FF_kj * dx * 20000;
+                atomicAdd(&q_a_rx[idz], dumm);
+                dumm = atom1FF * FF_kj * dy * 20000;
+                atomicAdd(&q_a_ry[idz], dumm);
+                dumm = atom1FF * FF_kj * dz * 20000;
+                atomicAdd(&q_a_rz[idz], dumm);
+
+                dx = x - atom2x;
+                dy = y - atom2y;
+                dz = z - atom2z;
+                r = sqrt(dx*dx+dy*dy+dz*dz);
+                idz = r += r; // Because we're using 0.5 A bins.
+                dumm = atom2FF * FF_kj * 10000;
+                atomicAdd(&q_a_r [idz+512], dumm);
+                dumm = atom2FF * FF_kj * dx * 20000;
+                atomicAdd(&q_a_rx[idz+512], dumm);
+                dumm = atom2FF * FF_kj * dy * 20000;
+                atomicAdd(&q_a_ry[idz+512], dumm);
+                dumm = atom2FF * FF_kj * dz * 20000;
+                atomicAdd(&q_a_rz[idz+512], dumm);
+
+                dx = x - atom3x;
+                dy = y - atom3y;
+                dz = z - atom3z;
+                r = sqrt(dx*dx+dy*dy+dz*dz);
+                idz = r += r; // Because we're using 0.5 A bins.
+                dumm = atom3FF * FF_kj * 10000;
+                atomicAdd(&q_a_r [idz+1024], dumm);
+                dumm = atom3FF * FF_kj * dx * 20000;
+                atomicAdd(&q_a_rx[idz+1024], dumm);
+                dumm = atom3FF * FF_kj * dy * 20000;
+                atomicAdd(&q_a_ry[idz+1024], dumm);
+                dumm = atom3FF * FF_kj * dz * 20000;
+                atomicAdd(&q_a_rz[idz+1024], dumm);
+
+/*                dx = x - atom4x;
+                dy = y - atom4y;
+                dz = z - atom4z;
+                r = sqrt(dx*dx+dy*dy+dz*dz);
+                idz = r += r; // Because we're using 0.5 A bins.
+                dumm = atom4FF * FF_kj * 10000;
+                atomicAdd(&q_a_r [idz+1536], dumm);
+                dumm = atom4FF * FF_kj * dx * 20000;
+                atomicAdd(&q_a_rx[idz+1536], dumm);
+                dumm = atom4FF * FF_kj * dy * 20000;
+                atomicAdd(&q_a_ry[idz+1536], dumm);
+                dumm = atom4FF * FF_kj * dz * 20000;
+                atomicAdd(&q_a_rz[idz+1536], dumm);
+*/
+            }
+
+            __syncthreads();
+
+            for (int kk = threadIdx.x; kk < 1536; kk += blockDim.x) {
+                float r = (float)(kk % 512 * 0.5 + 0.25);
+                float qr = q_pt * r;
+                float sqr = sin(qr) / qr;
+                float dsqr = cos(qr) - sqr;
+                float csqrr = dsqr / r / r;
+                    atomicAdd(&S_calcc[ii*num_atom2+jj],q_a_r[kk]  *   sqr);
+                    q_a_r[kk] = 0;
+                    atomicAdd(&f_ptxc[ii*num_atom2+jj],q_a_rx[kk]  *   csqrr);
+                    q_a_rx[kk] = 0;
+                    atomicAdd(&f_ptyc[ii*num_atom2+jj],q_a_ry[kk]  *   csqrr);
+                    q_a_ry[kk] = 0;
+                    atomicAdd(&f_ptzc[ii*num_atom2+jj],q_a_rz[kk]  *   csqrr);
+                    q_a_rz[kk] = 0;
+            }
+            __syncthreads();
+
+            /*
+            for (int stride = 1024 / 2; stride > 0; stride >>= 1) {
+                __syncthreads();
+                for(int iAccum = threadIdx.x; iAccum < stride; iAccum += blockDim.x) {
+                    q_a_r2[iAccum] += q_a_r2[stride + iAccum];
+                    q_a_rx2[iAccum] += q_a_rx2[stride + iAccum];
+                    q_a_ry2[iAccum] += q_a_ry2[stride + iAccum];
+                    q_a_rz2[iAccum] += q_a_rz2[stride + iAccum];
+                }
+            }
+            //__syncthreads();
+            if (threadIdx.x == 0) {
+                S_calcc[ii*num_atom2+jj]+= q_a_r2[0] ;
+                f_ptxc [ii*num_atom2+jj]+= q_a_rx2[0];
+                f_ptyc [ii*num_atom2+jj]+= q_a_ry2[0];
+                f_ptzc [ii*num_atom2+jj]+= q_a_rz2[0];
+            }
+            */
+ 
+        }
+        
+        //if (ii == 0 && threadIdx.x == 0) printf("\nS_calcc[0] = %.3f \n",S_calcc[0]);
+
+        // Tree-like summation of S_calcc to get S_calc
+        for (int stride = num_atom2 / 2; stride > 0; stride >>= 1) {
+            __syncthreads();
+            for(int iAccum = threadIdx.x; iAccum < stride; iAccum += blockDim.x) {
+                S_calcc[ii * num_atom2 + iAccum] += S_calcc[ii * num_atom2 + stride + iAccum];
+            }
+        }
+        __syncthreads();
+        
+        //if (threadIdx.x == 0) {
+            S_calc[ii] = S_calcc[ii * num_atom2]*1e-4;
+            Aq[ii] = S_calc[ii] - q_S_ref_dS[ii+num_q];
+            Aq[ii] *= -alpha;
+            Aq[ii] += q_S_ref_dS[ii + 2*num_q];
+            Aq[ii] *= k_chi / sigma2[ii];
+            Aq[ii] += Aq[ii];
+        //}
+        __syncthreads();
+        for (int jj = threadIdx.x; jj < num_atom; jj += blockDim.x) {
+            f_ptxc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+            f_ptyc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+            f_ptzc[ii * num_atom2 + jj] *= Aq[ii] * alpha * 1e-4;
+        }
+    }
+}
+/*
+__global__ void FF_calc_T (
+    float *FF_full,
+    float *FF_full_T,
+    int num_q2, 
+    int num_atom2) {
+
+
+    int TILE_DIM = 32;
+    int BLOCK_ROWS = num_atom2 * num_q2 / TILE_DIM;
+    __shared__ float tile[TILE_DIM * TILE_DIM+1];
+
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+    int width = gridDim.x * TILE_DIM;
+
+    for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
+        tile[(threadIdx.y+j)*TILE_DIM + threadIdx.x] = FF_full[(y+j)*width + x];
+
+    __syncthreads();
+    x = blockIdx.y * TILE_DIM + threadIdx.x;  // transpose block offset
+    y = blockIdx.x * TILE_DIM + threadIdx.y;
+    for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
+        FF_full_T[(y+j)*width + x] = tile[(threadIdx.y+j)*TILE_DIM + threadIdx.x];  
+
+}
+*/
+
+__global__ void __launch_bounds__(1024,2) scat_calc_bin_T (
+    float *coord, 
+    int *Ele,
+    float *q_S_ref_dS, 
+    float *S_calc, 
+    int num_atom,   
+    int num_q,    
+    int num_q2, 
+    int num_ele,   
+    float *Aq, 
+    float alpha,   
+    float k_chi,    
+    float sigma2,
+    float *f_ptxc_T, 
+    float *f_ptyc_T, 
+    float *f_ptzc_T, 
+    float *S_calcc_T, 
+    int num_atom2,
+    float *FF_full_T,
+    float *a_r_q,
+    float *a_r_qx,
+    float *a_r_qy,
+    float *a_r_qz) { 
+
+    // a_r_q is a 3D matrix of dimension 896 (16*56 for now), 416, num_q2
+    // every atom % 1024 will use a slice of that matrix, and every q vector will use an array
+    // of the slice, recording the FFT amplitude.
+
+    for (int ii = blockIdx.x; ii < num_atom; ii += gridDim.x) {
+        // Flush a_r_q
+
+        for (int jj = threadIdx.x; jj < num_q; jj += blockDim.x) {
+            for (int kk = 0; kk < 416; kk ++) {
+                a_r_q [ii % 896 * num_q2 * 416 + kk * num_q2 + jj] = 0.0;
+                a_r_qx[ii % 896 * num_q2 * 416 + kk * num_q2 + jj] = 0.0;
+                a_r_qy[ii % 896 * num_q2 * 416 + kk * num_q2 + jj] = 0.0;
+                a_r_qz[ii % 896 * num_q2 * 416 + kk * num_q2 + jj] = 0.0;
+            }
+
+
+        }
+ 
+        float atom1x = coord[ii+0];
+        float atom1y = coord[ii+1*num_atom];
+        float atom1z = coord[ii+2*num_atom];
+        __syncthreads();
+        // Calculate scattering for Aq
+        for (int jj = threadIdx.x; jj < num_q; jj += blockDim.x) {
+            float atom1FF = FF_full_T[ii * num_q2 + jj];
+            //if (ii == 0 && jj == 0) printf("\natom1FF is %.3f\n", atom1FF);
+            float q_pt = q_S_ref_dS[jj];
+            // for every q jj
+            for (int kk = 0; kk < num_atom; kk++) {
+                // for every atom kk
+                float FF_kj = atom1FF * FF_full_T[kk * num_q2 + jj];
+                float dx = coord[kk+0] - atom1x;
+                float dy = coord[kk+1*num_atom] - atom1y;
+                float dz = coord[kk+2*num_atom] - atom1z;
+                float r = sqrt(dx*dx+dy*dy+dz*dz);
+                /*if (ii == 0 && jj == 0 && kk == 1) {
+                    printf("\natom1 = %8.3f, %8.3f, %8.3f \natom2 = %8.3f, %8.3f, %.3f, \nr01 = %.3f\n",atom1x, atom1y, atom1z, coord[kk], coord[kk+num_atom], coord[kk+2*num_atom], r);
+                }*/
+                if (r < 200.0) {
+                    int idz = r * 2; // Because we're using 0.5 A bins.
+                    /*int ida = threadIdx.x / 256 * 256;
+                    atomicAdd(&q_a_r [idz+ida], (int)(FF_kj * 1e6));
+                    atomicAdd(&q_a_rx[idz+ida], (int)(2e6 * FF_kj * dx));
+                    atomicAdd(&q_a_ry[idz+ida], (int)(2e6 * FF_kj * dy));
+                    atomicAdd(&q_a_rz[idz+ida], (int)(2e6 * FF_kj * dz));*/
+                    a_r_q [ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj;
+                    a_r_qx[ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj * dx;
+                    a_r_qx[ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj * dx;
+                    a_r_qy[ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj * dy;
+                    a_r_qy[ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj * dy;
+                    a_r_qz[ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj * dz;
+                    a_r_qz[ii % 896*num_q2*416+idz*num_q2+jj] += FF_kj * dz;
+    
+                        /*float qr = q_pt * r; 
+                        float sqr = sin(qr) / qr;
+                        float dsqr = cos(qr) - sqr;
+                        float prefac = FF_kj * dsqr / r / r;
+                        prefac += prefac;
+                        S_calccs += FF_kj * sqr;
+                        f_ptxcs += prefac * dx;
+                        f_ptycs += prefac * dy;
+                        f_ptzcs += prefac * dz;*/
+                    //}
+                }    
+            }
+        
+            /*for (int stride = 512; stride > 128; stride >>= 1) {
+                __syncthreads();
+                for(int iAccum = threadIdx.x; iAccum < stride; iAccum += blockDim.x) {
+                    q_a_r[iAccum] += q_a_r[iAccum + stride];
+                    q_a_rx[iAccum] += q_a_rx[iAccum + stride];
+                    q_a_ry[iAccum] += q_a_ry[iAccum + stride];
+                    q_a_rz[iAccum] += q_a_rz[iAccum + stride];
+                }
+            }*/
+            //__syncthreads();
+
+            float S_calccs = 0.0;
+            float f_ptxcs = 0.0;
+            float f_ptycs = 0.0;
+            float f_ptzcs = 0.0;
+
+            for (int kk = 0; kk < 416; kk ++) {
+                float r = (float) kk * 0.5 + 0.25;
+                float qr = q_pt * r;
+                float sqr = sin(qr) / qr;
+                float dsqr = cos(qr) - sqr;
+                float csqrr = dsqr / r / r;
+                //atomicAdd(&S_calcc[ii*num_atom2+jj],(float)( 1e-6 * q_a_r[kk]  *   sqr[kk]));
+                //atomicAdd(&f_ptxc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rx[kk] * csqrr[kk]));
+                //atomicAdd(&f_ptyc[ii*num_atom2+jj], (float)( 1e-6 * q_a_ry[kk] * csqrr[kk]));
+                //atomicAdd(&f_ptzc[ii*num_atom2+jj], (float)( 1e-6 * q_a_rz[kk] * csqrr[kk]));
+                S_calccs += a_r_q [(ii % 896)*num_q2*416+kk*num_q2+jj] *   sqr;
+                f_ptxcs  += a_r_qx[(ii % 896)*num_q2*416+kk*num_q2+jj] * csqrr;
+                f_ptycs  += a_r_qy[(ii % 896)*num_q2*416+kk*num_q2+jj] * csqrr;
+                f_ptzcs  += a_r_qz[(ii % 896)*num_q2*416+kk*num_q2+jj] * csqrr;
+            }
+
+            S_calcc_T[ii*num_q2+jj]+= S_calccs;
+            f_ptxc_T[ii*num_q2+jj] += f_ptxcs ;
+            f_ptyc_T[ii*num_q2+jj] += f_ptycs ;
+            f_ptzc_T[ii*num_q2+jj] += f_ptzcs ;
+
+        }
+        
+    }
+    //if (blockIdx.x == 0 && threadIdx.x == 0) printf("\nS_calcc[0] = %.3f \n",S_calcc[0]);
+}
+
 
 __global__ void __launch_bounds__(1024,2) scat_calc_bin2 (
     float *coord, 
@@ -1294,7 +1958,7 @@ __global__ void sum_S_calc (
     int num_atom2,
     float alpha,
     float k_chi,
-    float sigma2) {
+    float *sigma2) {
 
     for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
         // Tree-like summation of S_calcc to get S_calc
@@ -1312,7 +1976,7 @@ __global__ void sum_S_calc (
             Aq[ii] = S_calc[ii] - q_S_ref_dS[ii+num_q];
             Aq[ii] *= -alpha;
             Aq[ii] += q_S_ref_dS[ii + 2*num_q];
-            Aq[ii] *= k_chi / sigma2;
+            Aq[ii] *= k_chi / sigma2[ii];
             Aq[ii] += Aq[ii];
         }
         __syncthreads();

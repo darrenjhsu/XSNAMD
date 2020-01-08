@@ -239,7 +239,8 @@ float fit_S_exp_to_S_calc_log(float *S_calc, float *S_exp, float *S_err, float *
 int main () {
     cudaFree(0);
 
-    int frames_total = 499;
+    int frames_total = 2001; // Modify according to your xyz files
+    int frames_to_use = 500; // Will be the last N frames
     float *coord, *S_calc, *S_calc_tot;
 
     // Declare cuda pointers //
@@ -250,7 +251,7 @@ int main () {
     float *d_q_S_ref_dS;     /* q vector, reference scattering pattern, and 
                                 measured difference pattern to fit.
                                 Since they are of same size they're grouped */
-                                
+    float *d_sigma2;         // Sigma square (standard error of mean) for the target diff pattern.
     float *d_Aq;             // Prefactor for each q
     float *d_S_calc;         // Calculated scattering curve
 
@@ -314,6 +315,7 @@ int main () {
     cudaMalloc((void **)&d_Force,      size_coord); // 40 KB
     cudaMalloc((void **)&d_Ele,        size_atom);
     cudaMalloc((void **)&d_q_S_ref_dS, 3 * size_q);
+    cudaMalloc((void **)&d_sigma2,     size_q);
     cudaMalloc((void **)&d_S_calc,     size_q); // Will be computed on GPU
     cudaMalloc((void **)&d_f_ptxc,     size_qxatom2);
     cudaMalloc((void **)&d_f_ptyc,     size_qxatom2);
@@ -355,6 +357,7 @@ int main () {
     cudaMemcpy(d_vdW,        vdW,        size_vdW,   cudaMemcpyHostToDevice);
     cudaMemcpy(d_Ele,        Ele,        size_atom,  cudaMemcpyHostToDevice);
     cudaMemcpy(d_q_S_ref_dS, q,          size_q,     cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sigma2,     dS_err,     size_q,     cudaMemcpyHostToDevice);
     cudaMemcpy(d_WK,         WK,         size_WK,    cudaMemcpyHostToDevice);
     // Only for HyPred
     cudaMemcpy(d_c2_H,       c2_H,       size_c2,    cudaMemcpyHostToDevice);
@@ -364,16 +367,16 @@ int main () {
     float sigma2 = 1.0;
     float alpha = 1.0;
 
-    float c1_init   = 0.95;
+    float c1_init   = 1.000;
     float c1_step   = 0.005;
-    float c1_end    = 1.05;
+    float c1_end    = 1.020;
     /*float c1_init   = 1.00;
     float c1_step   = 0.002;
     float c1_end    = 1.00;*/
     int c1_step_num = (int)((c1_end - c1_init) / c1_step + 1.0);
-    float c2_init   = 0.0;
+    float c2_init   = 0.9;
     float c2_step   = 0.1;
-    float c2_end    = 2.0;
+    float c2_end    = 1.3;
     /*float c2_init   = 1.0;
     float c2_step   = 0.1;
     float c2_end    = 1.0;*/
@@ -437,42 +440,44 @@ int main () {
                     coord[3*ll+2] = f3;
                     //printf("Coord[jj] = %.3f, Coord[jj+1] = %.3f, Coord[jj+2] = %.3f\n",coord[3*jj], coord[3*jj+1], coord[3*jj+2]);
                 }
-                printf("Calculating frame %d...\nThe first coordinate is %.3f", kk,coord[0]);
-                cudaMemcpy(d_coord, coord, size_coord, cudaMemcpyHostToDevice);
-                cudaMemset(d_Aq, 0.0, size_q);
-                cudaMemset(d_S_calc, 0.0, size_q);
-                cudaMemset(d_f_ptxc,0.0, size_qxatom2);
-                cudaMemset(d_f_ptyc,0.0, size_qxatom2);   
-                cudaMemset(d_f_ptzc,0.0, size_qxatom2);
-                cudaMemset(d_S_calcc,0.0, size_qxatom2);
-                cudaMemset(d_close_flag, 0, size_qxatom2);
-                cudaMemset(d_close_num, 0, size_atom2);
-                cudaMemset(d_close_idx, 0, size_atom2xatom2);
-                dist_calc<<<1024, 1024>>>(d_coord, //d_dx, d_dy, d_dz, 
-                                          d_close_num, d_close_flag, d_close_idx, num_atom, num_atom2); 
-                surf_calc<<<1024,512>>>(d_coord, d_Ele, d_close_num, d_close_idx, d_vdW, 
-                                        num_atom, num_atom2, num_raster, sol_s, d_V);
-                sum_V<<<1,1024>>>(d_V, d_V_s, num_atom, num_atom2, d_Ele, d_vdW);
-                FF_calc<<<320, 32>>>(d_q_S_ref_dS, d_WK, d_vdW, num_q, num_ele, c1, r_m, d_FF_table, rho);
-                create_FF_full_FoXS<<<320, 1024>>>(d_FF_table, d_V, c2_F, d_Ele, d_FF_full, 
-                                              num_q, num_ele, num_atom, num_atom2);
-                scat_calc<<<320, 1024>>>(d_coord,    
-                                         d_Ele,        
-                                         d_q_S_ref_dS, 
-                                         d_S_calc, num_atom,  num_q,     num_ele,  d_Aq, 
-                                         alpha,    k_chi,     sigma2,    d_f_ptxc, d_f_ptyc, 
-                                         d_f_ptzc, d_S_calcc, num_atom2, 
-                                         d_FF_full);
-                cudaMemcpy(S_calc ,d_S_calc, size_q,     cudaMemcpyDeviceToHost);
-                for (int jj = 0; jj < num_q; jj++) {
-                    S_calc_tot[jj] += S_calc[jj];
+                if (kk > frames_total - frames_to_use) {
+                    printf("Calculating frame %d...\nThe first coordinate is %.3f", kk,coord[0]);
+                    cudaMemcpy(d_coord, coord, size_coord, cudaMemcpyHostToDevice);
+                    cudaMemset(d_Aq, 0.0, size_q);
+                    cudaMemset(d_S_calc, 0.0, size_q);
+                    cudaMemset(d_f_ptxc,0.0, size_qxatom2);
+                    cudaMemset(d_f_ptyc,0.0, size_qxatom2);   
+                    cudaMemset(d_f_ptzc,0.0, size_qxatom2);
+                    cudaMemset(d_S_calcc,0.0, size_qxatom2);
+                    cudaMemset(d_close_flag, 0, size_qxatom2);
+                    cudaMemset(d_close_num, 0, size_atom2);
+                    cudaMemset(d_close_idx, 0, size_atom2xatom2);
+                    dist_calc<<<1024, 1024>>>(d_coord, //d_dx, d_dy, d_dz, 
+                                              d_close_num, d_close_flag, d_close_idx, num_atom, num_atom2); 
+                    surf_calc<<<1024,512>>>(d_coord, d_Ele, d_close_num, d_close_idx, d_vdW, 
+                                            num_atom, num_atom2, num_raster, sol_s, d_V);
+                    sum_V<<<1,1024>>>(d_V, d_V_s, num_atom, num_atom2, d_Ele, d_vdW);
+                    FF_calc<<<320, 32>>>(d_q_S_ref_dS, d_WK, d_vdW, num_q, num_ele, c1, r_m, d_FF_table, rho);
+                    create_FF_full_FoXS<<<320, 1024>>>(d_FF_table, d_V, c2_F, d_Ele, d_FF_full, 
+                                                  num_q, num_ele, num_atom, num_atom2);
+                    scat_calc<<<320, 1024>>>(d_coord,    
+                                             d_Ele,        
+                                             d_q_S_ref_dS, 
+                                             d_S_calc, num_atom,  num_q,     num_ele,  d_Aq, 
+                                             alpha,    k_chi,     d_sigma2,  d_f_ptxc, d_f_ptyc,
+                                             d_f_ptzc, d_S_calcc, num_atom2, 
+                                             d_FF_full);
+                    cudaMemcpy(S_calc ,d_S_calc, size_q,     cudaMemcpyDeviceToHost);
+                    for (int jj = 0; jj < num_q; jj++) {
+                        S_calc_tot[jj] += S_calc[jj];
+                    }
                 }
             }
-            fclose(fpt);
             for (int ii = 0; ii < num_q; ii++) {
-                S_calc_tot[ii] /= float(frames_total);
-                //printf("q = %.3f, S(q) = %.5f \n", q_S_ref_dS[ii], S_calc_tot[ii]);
+                S_calc_tot[ii] /= float(frames_to_use);
+                printf("q = %.3f, S(q) = %.5f \n", q[ii], S_calc_tot[ii]);
             }
+            fclose(fpt);
             
             // Need to do some sort of fitting. 
             if (use_log) {

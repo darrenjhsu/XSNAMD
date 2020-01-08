@@ -103,7 +103,7 @@ structures to calculate the target scattering profile. In this case, run
 
 
 
-Of the files, 
+<!--Of the files, 
 
 Init\_calc.cu       calculates with given two sets of coordinates, the scattering pattern for reference (S\_ref) and for initial (S\_init) structures, and then compute the difference (dS = S\_ref - S\_init)
 
@@ -111,4 +111,5 @@ raster.cu          specifies parameters.
 kernel.cu          is the workhorse of the package.
 XSMD.cu            is where the code NAMD calls every step is in.
 speedtest.cu       is to test new features. 
+-->
 

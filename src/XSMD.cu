@@ -182,7 +182,7 @@ if (frame_num % delta_t == 0) {
        exit(-1);
     }
 
-/*    surf_calc<<<1024,512>>>(
+    surf_calc<<<1024,512>>>(
         d_coord, 
         d_Ele, 
         d_close_num, 
@@ -193,8 +193,8 @@ if (frame_num % delta_t == 0) {
         num_raster, 
         sol_s, 
         d_V);
-*/
-    surf_calc_surf_grad<<<1024,512>>>(
+
+    /*surf_calc_surf_grad<<<1024,512>>>(
         d_coord, 
         d_Ele, 
         d_close_num, 
@@ -207,7 +207,7 @@ if (frame_num % delta_t == 0) {
         d_V,
         d_surf_grad,
         offset);
-
+    */
     cudaDeviceSynchronize();
     error = cudaGetLastError();
     if(error!=cudaSuccess)
@@ -255,7 +255,7 @@ if (frame_num % delta_t == 0) {
         num_atom, 
         num_atom2);
 */
-/*    create_FF_full_FoXS<<<320, 1024>>>(
+    create_FF_full_FoXS<<<320, 1024>>>(
         d_FF_table, 
         d_V,
         c2, 
@@ -265,8 +265,8 @@ if (frame_num % delta_t == 0) {
         num_ele, 
         num_atom, 
         num_atom2);
-*/
 
+/*
     create_FF_full_FoXS_surf_grad<<<320, 1024>>>(
         d_FF_table, 
         d_V,
@@ -278,7 +278,7 @@ if (frame_num % delta_t == 0) {
         num_ele, 
         num_atom, 
         num_atom2);
-
+*/
     cudaDeviceSynchronize();
     error = cudaGetLastError();
     if(error!=cudaSuccess)

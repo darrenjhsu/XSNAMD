@@ -5,7 +5,7 @@
 #include <gsl/gsl_multimin.h>
 //#include <gsl/gsl_vector.h>
 #include "kernel.cu"
-#include "speedtest.hh"
+//#include "speedtest.hh"
 #include "env_param.hh"
 #include "mol_param.hh"
 //#include "scat_param.hh"
@@ -249,6 +249,7 @@ int main () {
                                 measured difference pattern to fit.
                                 Since they are of same size they're grouped */
                                 
+    float *d_sigma2;         // Sigma square (standard error of mean) for the target diff pattern.
     float *d_Aq;             // Prefactor for each q
     float *d_S_calc;         // Calculated scattering curve
 
@@ -308,6 +309,7 @@ int main () {
     cudaMalloc((void **)&d_Force,      size_coord); // 40 KB
     cudaMalloc((void **)&d_Ele,        size_atom);
     cudaMalloc((void **)&d_q_S_ref_dS, 3 * size_q);
+    cudaMalloc((void **)&d_sigma2,     size_q);
     cudaMalloc((void **)&d_S_calc,     size_q); // Will be computed on GPU
     cudaMalloc((void **)&d_f_ptxc,     size_qxatom2);
     cudaMalloc((void **)&d_f_ptyc,     size_qxatom2);
@@ -348,6 +350,7 @@ int main () {
     cudaMemcpy(d_coord,      coord_init, size_coord, cudaMemcpyHostToDevice);
     cudaMemcpy(d_vdW,        vdW,        size_vdW,   cudaMemcpyHostToDevice);
     cudaMemcpy(d_Ele,        Ele,        size_atom,  cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sigma2,     dS_err,     size_q,     cudaMemcpyHostToDevice);
     cudaMemcpy(d_q_S_ref_dS, q,          size_q,     cudaMemcpyHostToDevice);
     cudaMemcpy(d_WK,         WK,         size_WK,    cudaMemcpyHostToDevice);
     // Only for HyPred
@@ -358,19 +361,19 @@ int main () {
     float sigma2 = 1.0;
     float alpha = 1.0;
 
-    float c1_init   = 0.95;
+    /*float c1_init   = 0.95;
     float c1_step   = 0.002;
-    float c1_end    = 1.05;
-    /*float c1_init   = 1.00;
+    float c1_end    = 1.05;*/
+    float c1_init   = 1.00;
     float c1_step   = 0.002;
-    float c1_end    = 1.00;*/
+    float c1_end    = 1.00;
     int c1_step_num = (int)((c1_end - c1_init) / c1_step + 1.0);
-    float c2_init   = 0.0;
+    /*float c2_init   = 0.0;
+    float c2_step   = 0.1;
+    float c2_end    = 2.0;*/
+    float c2_init   = 2.0;
     float c2_step   = 0.1;
     float c2_end    = 2.0;
-    /*float c2_init   = 1.0;
-    float c2_step   = 0.1;
-    float c2_end    = 1.0;*/
     int c2_step_num = (int)((c2_end - c2_init) / c2_step + 1.0);
     int use_log     = 0;
 
@@ -472,7 +475,7 @@ int main () {
                 d_Aq, 
                 alpha,    
                 k_chi,     
-                sigma2,    
+                d_sigma2,    
                 d_f_ptxc, 
                 d_f_ptyc, 
                 d_f_ptzc, 
@@ -604,9 +607,12 @@ int main () {
     fprintf(fp, "\n#include \"scat_param.hh\"\n\n");
     fprintf(fp, "int num_q = %d;\n", num_q);
     fprintf(fp, "int num_q2 = %d;\n", (num_q+31)/32*32);
-    fprintf(fp, "float c1 = %.3f;\n", min_c1);
+    /*fprintf(fp, "float c1 = %.3f;\n", min_c1);
     fprintf(fp, "float c2 = %.3f;\n", min_c2);
-    fprintf(fp, "float c = %.3f;\n", min_c);
+    fprintf(fp, "float c = %.3f;\n", min_c);*/
+    fprintf(fp, "float c1 = %.3f;\n", 1.000);
+    fprintf(fp, "float c2 = %.3f;\n", 2.000);
+    fprintf(fp, "float c = %.3f;\n", 1.000);
     fprintf(fp, "float q_S_ref_dS[%d] = {", 3 * num_q);
     for (int ii = 0; ii < num_q; ii++) {
         fprintf(fp, "%.5f", q[ii]);
@@ -637,8 +643,14 @@ int main () {
         if (ii < num_q -1) fprintf(fp,", ");
     }
     fprintf(fp, "\n");
-    fclose(fp);
+    fprintf(fp, "float dS_err[%d] = {", num_q);
+    for (int ii = 0; ii < num_q; ii++) {
+        fprintf(fp, "%.5f", dS_err[ii] * min_c);
+        if (ii < num_q - 1) fprintf(fp, ", ");
+    }
+    fprintf(fp, "};\n");
 
+    fclose(fp);
     fp = fopen("scat_param.hh","w");
     fprintf(fp, "extern int num_q;\n");
     fprintf(fp, "extern int num_q2;\n");
@@ -646,6 +658,7 @@ int main () {
     fprintf(fp, "extern float c2;\n");
     fprintf(fp, "extern float c;\n");
     fprintf(fp, "extern float q_S_ref_dS[%d];\n", 3 * num_q);
+    fprintf(fp, "extern float dS_err[%d];\n", num_q);
     
     fclose(fp);
 
