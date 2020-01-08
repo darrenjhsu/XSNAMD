@@ -103,7 +103,8 @@ Root Folder
 
 ### If you want to fit c, c1, and c2 with one starting strcuture and one static experimental measurement
 
-1. Input data are prepared in data/PROT1/, where PROT1 is your protein's name.
+1. Assuming the input data are prepared in data/PROT1/, where PROT1 is your 
+   protein's name.
 
 1. An input python file **input.py** contains pointers to the PDB and PSF 
    files (that you probably generated through `<psfgen`> in VMD), scattering
@@ -113,6 +114,10 @@ Root Folder
 
 1. Run `python input.py` to parse the PDB and PSF files and generate
    `mol_param.cu/hh` and `coord_ref.cu/hh`. 
+
+1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
+   script file, and execute it by `./make_input` to copy the .cu/hh files from
+   /data/PROT1 to /src .    
 
 1. Run `make fit DSET=PROT1` to compile `fit_initial.cu` 
 
@@ -137,7 +142,8 @@ Good for test runs. Manuals coming ...
 It is encouraged that you do an equilibrium run for the structure and fit the
 average of that run to the static measurement. To do that see next section.
 
-1. Input data are prepared in data/PROT1/, where PROT1 is your protein's name.
+1. Assuming the input data are prepared in data/PROT1/, where PROT1 is your 
+   protein's name.
 
 1. An input python file **input.py** contains pointers to the PDB and PSF 
    files (that you probably generated through `<psfgen`> in VMD), scattering
@@ -147,6 +153,10 @@ average of that run to the static measurement. To do that see next section.
 
 1. Run `python input.py` to parse the PDB and PSF files and generate
    `mol_param.cu/hh` and `coord_ref.cu/hh`. 
+
+1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
+   script file, and execute it by `./make_input` to copy the .cu/hh files from
+   /data/PROT1 to /src .    
 
 1. Run `make fit DSET=PROT1` to compile `fit_initial.cu`
 
@@ -179,7 +189,8 @@ average of that run to the static measurement. To do that see next section.
 
 This is the ideal setting.
 
-1. Input data are prepared in data/PROT1/, where PROT1 is your protein's name.
+1. Assuming the input data are prepared in data/PROT1/, where PROT1 is your 
+   protein's name.
 
 1. An input python file **input.py** contains pointers to the PDB and PSF 
    files (that you probably generated through `<psfgen`> in VMD), scattering
@@ -193,6 +204,10 @@ This is the ideal setting.
 1. Export the atomic coordinates of the solute (a.k.a. the atoms you're using
    to calculate the scattering pattern) from the equilibrium run as a
    multiframe xyz file named `trajectory.xyz` to the root folder.
+
+1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
+   script file, and execute it by `./make_input` to copy the .cu/hh files from
+   /data/PROT1 to /src .    
 
 1. Run `make fit_traj DSET=PROT1` to compile `fit_traj_initial.cu`
 
@@ -220,7 +235,9 @@ This is the ideal setting.
 1. During the simulation, look at the log file. It should show the chi square
    decreasing gradually. 
 
+### Combining the XSMD simulations with metadynamics
 
+Manuals coming ...
 
 <!--Of the files, 
 
