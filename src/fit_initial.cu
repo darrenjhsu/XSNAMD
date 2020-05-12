@@ -361,22 +361,22 @@ int main () {
     float sigma2 = 1.0;
     float alpha = 1.0;
 
-    /*float c1_init   = 0.95;
+    float c1_init   = 0.96;
+    float c1_step   = 0.02;
+    float c1_end    = 1.06;
+    /*float c1_init   = 1.00;
     float c1_step   = 0.002;
-    float c1_end    = 1.05;*/
-    float c1_init   = 1.00;
-    float c1_step   = 0.002;
-    float c1_end    = 1.00;
+    float c1_end    = 1.00;*/
     int c1_step_num = (int)((c1_end - c1_init) / c1_step + 1.0);
-    /*float c2_init   = 0.0;
+    float c2_init   = 0.0;
+    float c2_step   = 0.4;
+    float c2_end    = 3.2;
+    /*float c2_init   = 2.0;
     float c2_step   = 0.1;
     float c2_end    = 2.0;*/
-    float c2_init   = 2.0;
-    float c2_step   = 0.1;
-    float c2_end    = 2.0;
     int c2_step_num = (int)((c2_end - c2_init) / c2_step + 1.0);
     int use_log     = 0;
-
+    int outputFile  = 1;
     float *chi_sq = (float *)malloc(c1_step_num * c2_step_num * sizeof(float));
     float *c = (float *)malloc(c1_step_num * c2_step_num * sizeof(float));
     float *a = (float *)malloc(c1_step_num * c2_step_num * sizeof(float));
@@ -418,7 +418,7 @@ int main () {
     printf("\n");*/
     
 
-    float c1 = c1_init;
+    float c1_fit = c1_init;
     int idx = 0;
     int min_idx = 0;
     float min_chi2 = FLT_MAX; 
@@ -428,14 +428,14 @@ int main () {
     float min_c2;
     float *min_S_calc = (float *)malloc(num_q * sizeof(float));
     for (int ii = 0; ii < c1_step_num; ii++) {
-        float c2_F = c2_init;
+        float c2_F_fit = c2_init;
         FF_calc<<<320, 32>>>(
             d_q_S_ref_dS, 
             d_WK, 
             d_vdW, 
             num_q, 
             num_ele, 
-            c1, 
+            c1_fit, 
             r_m, 
             d_FF_table,
             rho);
@@ -456,7 +456,7 @@ int main () {
             create_FF_full_FoXS<<<320, 1024>>>(
                 d_FF_table, 
                 d_V,
-                c2_F,
+                c2_F_fit,
                 d_Ele, 
                 d_FF_full, 
                 num_q, 
@@ -484,66 +484,6 @@ int main () {
                 d_FF_full);
 
 
-
-/*            scat_calc_bin<<<320, 1024>>>(
-                d_coord, 
-                d_Ele,
-                d_q_S_ref_dS, 
-                d_S_calc, 
-                num_atom,  
-                num_q,     
-                num_ele,  
-                d_Aq, 
-                alpha,    
-                k_chi,     
-                sigma2,    
-                d_f_ptxc, 
-                d_f_ptyc, 
-                d_f_ptzc, 
-                d_S_calcc, 
-                num_atom2, 
-                d_FF_full
-            );
-*/
-/*
-            int num_atom_3 = (num_atom + 3071) / 3072 * 3072;
-            scat_calc_bin2<<<15, 1024, 12288 * sizeof(float)>>>(
-                d_coord, 
-                d_Ele,
-                d_q_S_ref_dS, 
-                d_S_calc, 
-                num_atom,  
-                num_q,     
-                num_ele,  
-                d_Aq, 
-                alpha,    
-                k_chi,     
-                sigma2,    
-                d_f_ptxc, 
-                d_f_ptyc, 
-                d_f_ptzc, 
-                d_S_calcc, 
-                num_atom2, 
-                d_FF_full,
-                d_q_a_r,
-                num_atom_3
-            );
-            
-            sum_S_calc<<<num_q, 1024>>>(
-                d_S_calcc,
-                d_f_ptxc,
-                d_f_ptyc,
-                d_f_ptzc,
-                d_S_calc,
-                d_Aq, 
-                d_q_S_ref_dS,
-                num_q, 
-                num_atom,
-                num_atom2,
-                alpha,
-                k_chi,
-                sigma2);
-       */ 
             cudaMemcpy(S_calc, d_S_calc, size_q,     cudaMemcpyDeviceToHost);
             
             // Need to do some sort of fitting. 
@@ -560,8 +500,8 @@ int main () {
                 min_idx = idx;
                 min_c = c[idx];
                 min_a = a[idx];
-                min_c1 = c1;
-                min_c2 = c2_F;
+                min_c1 = c1_fit;
+                min_c2 = c2_F_fit;
                 for (int kk = 0; kk < num_q; kk++) {
                     min_S_calc[kk] = S_calc[kk];
                 }
@@ -571,9 +511,125 @@ int main () {
                 printf("%.5f ",S_calc[kk]);
             }
             printf("\n");*/
+
+            if (outputFile) {
+                // Output
+                printf("#Fitting result: \n");
+                printf("#c1 = %.3f, c2 = %.3f, c = %.3e, a = %.3e, chi2 = %.3e \n", 
+                            c1_fit,  c2_F_fit,   c[idx],   a[idx], chi_sq[idx]);
+            
+                FILE *fp = fopen("scat_param_log.txt","a");
+                fprintf(fp, "\n//SCAT_PARAM_LOG_%.3f_%.3f", c1_fit, c2_F_fit);
+                fprintf(fp, "\n#include \"scat_param.hh\"\n\n");
+                fprintf(fp, "int num_q = %d;\n", num_q);
+                fprintf(fp, "int num_q2 = %d;\n", (num_q+31)/32*32);
+                fprintf(fp, "float c1 = %.3f;\n", c1_fit);
+                fprintf(fp, "float c2 = %.3f;\n", c2_F_fit);
+                fprintf(fp, "float c = %.3f;\n", c[idx]);
+                fprintf(fp, "float q_S_ref_dS[%d] = {", 3 * num_q);
+                for (int ii = 0; ii < num_q; ii++) {
+                    fprintf(fp, "%.5f", q[ii]);
+                    fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                for (int ii = 0; ii < num_q; ii++) {
+                    fprintf(fp, "%.5f", S_calc[ii]);
+                    fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                double sum_potential = 0.0;
+                for (int ii = 0; ii < num_q; ii++) {
+                    if (use_log) {
+                        fprintf(fp, "%.5f", dS_exp[ii] * pow(10.0,c[idx]) - a[idx]);
+                        sum_potential += (S_exp[ii] * pow(10.0,c[idx]) - a[idx])*(S_exp[ii] * pow(10.0,c[idx]) - a[idx]) / dS_err[ii];
+                    } else {
+                        fprintf(fp, "%.5f", dS_exp[ii] * c[idx] - a[idx]);
+                        sum_potential += (dS_exp[ii] * c[idx] - a[idx]) * (dS_exp[ii] * c[idx] - a[idx]) / dS_err[ii];
+                    }
+                    if (ii < num_q -1) fprintf(fp,", ");
+                }
+                fprintf(fp, "};\n//");
+                 
+                for (int ii = 0; ii < num_q; ii++) {
+                    if (use_log) {
+                        fprintf(fp, "%.5f", S_exp[ii] * pow(10.0,c[idx]) + a[idx]);
+                    } else {
+                        fprintf(fp, "%.5f", S_exp[ii] * c[idx] + a[idx]);
+                    }
+                    if (ii < num_q -1) fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                fprintf(fp, "float dS_err[%d] = {", num_q);
+                for (int ii = 0; ii < num_q; ii++) {
+                    fprintf(fp, "%.5f", dS_err[ii] * c[idx]);
+                    if (ii < num_q - 1) fprintf(fp, ", ");
+                }
+                fprintf(fp, "};\n\n");
+            
+                fprintf(fp, "//SCAT_KCHI_%.3f_%.3f\n", c1_fit, c2_F_fit);
+                fprintf(fp, "float k_chi = %.3e;\n", 28.0 / sum_potential);
+                fprintf(fp, "sum of potential is %.3e\n", sum_potential);
+                fclose(fp);
+                fp = fopen("scat_param_log.hh","a");
+                fprintf(fp, "\n//SCAT_PARAM_LOG_%.3f_%.3f\n", c1_fit, c2_F_fit);
+                fprintf(fp, "extern int num_q;\n");
+                fprintf(fp, "extern int num_q2;\n");
+                fprintf(fp, "extern float c1;\n");
+                fprintf(fp, "extern float c2;\n");
+                fprintf(fp, "extern float c;\n");
+                fprintf(fp, "extern float q_S_ref_dS[%d];\n", 3 * num_q);
+                fprintf(fp, "extern float dS_err[%d];\n", num_q);
+                
+                fclose(fp);
+            
+                fp = fopen("scat_param_log.dat","a");
+            
+                fprintf(fp,"data = [");
+                for (int ii = 0; ii < num_q; ii++) {
+                    fprintf(fp, "%.5f", q[ii]);
+                    fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                for (int ii = 0; ii < num_q; ii++) {
+                    fprintf(fp, "%.5f", S_calc[ii]);
+                    fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                for (int ii = 0; ii < num_q; ii++) {
+                    if (use_log) {
+                        fprintf(fp, "%.5f", S_exp[ii] * pow(10.0,c[idx]) + a[idx] - S_calc[ii]);
+                    } else {
+                        fprintf(fp, "%.5f", S_exp[ii] * c[idx] + a[idx] - S_calc[ii]);
+                    }
+                    fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                 
+                for (int ii = 0; ii < num_q; ii++) {
+                    if (use_log) {
+                        fprintf(fp, "%.5f", S_exp[ii] * pow(10.0,c[idx]) + a[idx]);
+                    } else {
+                        fprintf(fp, "%.5f", S_exp[ii] * c[idx] + a[idx]);
+                    }
+                    fprintf(fp,", ");
+                }
+                fprintf(fp, "\n");
+                for (int ii = 0; ii < num_q; ii++) {
+                    if (use_log) {
+                        fprintf(fp, "%.5f", S_err[ii] * pow(10.0,c[idx]) + a[idx]);
+                    } else {
+                        fprintf(fp, "%.5f", S_err[ii] * c[idx] + a[idx]);
+                    }
+                    if (ii < num_q-1) fprintf(fp,", ");
+                }
+                fprintf(fp, "];\n");
+                fclose(fp);
+                            
+            }
+
  
             idx++;
-            
+            printf("Now processing idx %d\n",idx); 
             // Initialize some matrices
             cudaMemset(d_close_flag, 0,   size_qxatom2);
             cudaMemset(d_Force,      0.0, size_coord);
@@ -591,10 +647,10 @@ int main () {
             cudaMemset(d_q_a_ry,     0.0, size_q_a_r);
             cudaMemset(d_q_a_rz,     0.0, size_q_a_r);*/
             
-            c2_F += c2_step;
+            c2_F_fit += c2_step;
         }
 
-        c1 += c1_step;
+        c1_fit += c1_step;
     }
     
 
@@ -607,12 +663,12 @@ int main () {
     fprintf(fp, "\n#include \"scat_param.hh\"\n\n");
     fprintf(fp, "int num_q = %d;\n", num_q);
     fprintf(fp, "int num_q2 = %d;\n", (num_q+31)/32*32);
-    /*fprintf(fp, "float c1 = %.3f;\n", min_c1);
+    fprintf(fp, "float c1 = %.3f;\n", min_c1);
     fprintf(fp, "float c2 = %.3f;\n", min_c2);
-    fprintf(fp, "float c = %.3f;\n", min_c);*/
-    fprintf(fp, "float c1 = %.3f;\n", 1.000);
+    fprintf(fp, "float c = %.3f;\n", min_c);
+    /*fprintf(fp, "float c1 = %.3f;\n", 1.000);
     fprintf(fp, "float c2 = %.3f;\n", 2.000);
-    fprintf(fp, "float c = %.3f;\n", 1.000);
+    fprintf(fp, "float c = %.3f;\n", 1.000);*/
     fprintf(fp, "float q_S_ref_dS[%d] = {", 3 * num_q);
     for (int ii = 0; ii < num_q; ii++) {
         fprintf(fp, "%.5f", q[ii]);
@@ -626,9 +682,9 @@ int main () {
     fprintf(fp, "\n");
     for (int ii = 0; ii < num_q; ii++) {
         if (use_log) {
-            fprintf(fp, "%.5f", S_exp[ii] * pow(10.0,min_c) + min_a - min_S_calc[ii]);
+            fprintf(fp, "%.5f", dS_exp[ii] * pow(10.0,min_c) + min_a - min_S_calc[ii]);
         } else {
-            fprintf(fp, "%.5f", S_exp[ii] * min_c + min_a - min_S_calc[ii]);
+            fprintf(fp, "%.5f", dS_exp[ii] * min_c + min_a - min_S_calc[ii]);
         }
         if (ii < num_q -1) fprintf(fp,", ");
     }

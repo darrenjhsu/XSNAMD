@@ -9,12 +9,17 @@
 #include "env_param.hh" // So we have c2 to use
 #include "WaasKirf.hh"
 
-int main() {
+int main(int argc, char* argv[]) {
+
+// Calculate scattering for every frame in trajectory
+// argv[1]: name of the file
+// argv[2]: number of frames
+
 // Parameters
     //int num_q = 98;
     //int num_atom = 3649;
-    int frames_to_average = 1001; // Will be the last n frames of the traj
-    int frames_total = 2001; // Look at the xyz file
+    int frames_to_average = atoi(argv[2]); // Will be the last n frames of the traj
+    int frames_total = atoi(argv[2]); // Look at the xyz file
 
     float *coord, *S_calc, *S_calc_tot;
     float *d_coord, *d_S_calc;
@@ -107,7 +112,7 @@ int main() {
     float alpha = 1.0;
 
     //FILE *fp = fopen("aligned_protein.xyz","r");
-    FILE *fp = fopen("1f6s_eq.xyz","r");
+    FILE *fp = fopen(argv[1],"r");
     if (fp == NULL) {
         printf("Opening file failed.\n");
         return 1;
@@ -127,6 +132,8 @@ int main() {
             coord[3*jj+2] = f3;
             //printf("Coord[jj] = %.3f, Coord[jj+1] = %.3f, Coord[jj+2] = %.3f\n",coord[3*jj], coord[3*jj+1], coord[3*jj+2]);
         }
+        printf("First coordinate is: %.3f\n",coord[0]);
+        printf("Final coordinate is: %.3f\n",coord[3*num_atom-1]);
         if (ii >= frames_total - frames_to_average) {
             printf("Calculating frame %d...\n", ii);
             cudaMemcpy(d_coord, coord, size_coord, cudaMemcpyHostToDevice);
@@ -146,7 +153,7 @@ int main() {
             // Output V
             cudaMemcpy(V, d_V, size_atom2f, cudaMemcpyDeviceToHost);
             
-            printf("V, ");
+            printf("V for frame %5d, ",ii);
             for (int jj = 0; jj < num_atom; jj++) {
                 printf("%6.3f", V[jj]);
                 if (jj < num_atom - 1) {
@@ -169,7 +176,7 @@ int main() {
                                      d_f_ptzc, d_S_calcc, num_atom2, 
                                      d_FF_full);
             cudaMemcpy(S_calc ,d_S_calc, size_q,     cudaMemcpyDeviceToHost);
-            printf("S_calc: ");
+            printf("S_calc for frame %5d, ",ii);
             for (int jj = 0; jj < num_q; jj++) {
                 printf("%6.3f, ", S_calc[jj]);
                 S_calc_tot[jj] += S_calc[jj];

@@ -5,7 +5,7 @@
 #include <gsl/gsl_multimin.h>
 //#include <gsl/gsl_vector.h>
 #include "kernel.cu"
-#include "speedtest.hh"
+//#include "speedtest.hh"
 #include "env_param.hh"
 #include "mol_param.hh"
 //#include "scat_param.hh"
@@ -236,11 +236,16 @@ float fit_S_exp_to_S_calc_log(float *S_calc, float *S_exp, float *S_err, float *
 }
 
 
-int main () {
+int main (int argc, char* argv[]) {
+
+// Calculate scattering for every frame in trajectory
+// argv[1]: name of the file
+// argv[2]: number of frames (2001)
+// argv[3]: using how many frames to fit (500)
     cudaFree(0);
 
-    int frames_total = 2001; // Modify according to your xyz files
-    int frames_to_use = 500; // Will be the last N frames
+    int frames_total = atoi(argv[2]); // Modify according to your xyz files
+    int frames_to_use = atoi(argv[3]); // Will be the last N frames
     float *coord, *S_calc, *S_calc_tot;
 
     // Declare cuda pointers //
@@ -367,16 +372,16 @@ int main () {
     float sigma2 = 1.0;
     float alpha = 1.0;
 
-    float c1_init   = 1.000;
-    float c1_step   = 0.005;
+    float c1_init   = 0.995;
+    float c1_step   = 0.001;
     float c1_end    = 1.020;
     /*float c1_init   = 1.00;
     float c1_step   = 0.002;
     float c1_end    = 1.00;*/
     int c1_step_num = (int)((c1_end - c1_init) / c1_step + 1.0);
-    float c2_init   = 0.9;
-    float c2_step   = 0.1;
-    float c2_end    = 1.3;
+    float c2_init   = 0.8;
+    float c2_step   = 0.05;
+    float c2_end    = 1.4;
     /*float c2_init   = 1.0;
     float c2_step   = 0.1;
     float c2_end    = 1.0;*/
@@ -420,7 +425,7 @@ int main () {
 
             // For every parameter
             
-            FILE *fpt = fopen("trajectory.txt","r");
+            FILE *fpt = fopen(argv[1],"r");
             if (fpt == NULL) {
                 printf("Opening file failed.\n");
                 return 1;
@@ -615,7 +620,7 @@ int main () {
     fclose(fp);
 
     fp = fopen("scat_param_traj.dat","w");
-
+    fprintf(fp,"# Rows are q, best S_calc, best S_calc deviation, scaled dS, scaled dS_err, best scaled S_exp, best scaled S_err.\n");
     fprintf(fp,"data = [");
     for (int ii = 0; ii < num_q; ii++) {
         fprintf(fp, "%.5f", q[ii]);

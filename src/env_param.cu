@@ -1,6 +1,6 @@
 #include "env_param.hh"
 
-float k_chi = 5.000e-07;
+float k_chi = 7.380e-06;
 int num_ele = 6;
 int num_raster = 512;
 int num_raster2 = 512;
@@ -11,6 +11,6 @@ float c2_H[10] = { 0.00000, -0.08428, -0.68250,  1.59535,  0.23293,  0.00000,
 float r_m = 1.62;
 float rho = 0.334;
 int delta_t = 50; // Frames, 1.0 ps.
-int tau = 5e3; // Frames, 50 ps.
+int tau = 5e4; // Frames, 50 ps.
 
 
