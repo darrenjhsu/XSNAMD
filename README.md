@@ -51,11 +51,42 @@ Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper.
 
 ## Requirements
 
-This program is written in CUDA C and runs only on Nvidia GPUs.
+### Hardware
 
-For some parts GNU Scientific Library (GSL) is required. 
+This program is written in CUDA C and runs only on Nvidia GPUs. It assumes
+that you have access to an Nvidia GPU. At the time of writing, this code has
+been tested on K40, K80, and P100 cards.
 
-There are some python files too. 
+### Software
+
+For some parts GNU Scientific Library (GSL) >= 2.5 is required. Your cluster
+may have it installed. In that case, set the path in the Makefile to it.
+Otherwise, you need to install a local copy of GSL and point to the directory
+in the Makefile. More on that in the Installation section 
+
+Nvidia's nvcc compiler is required. Consult your system administrator about
+cuda availability on your machine. 
+
+SWIG interface is required. It's likely already installed on your machine. See
+`http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation` for more
+inforamtion about installing it on your server.  
+
+There is a basic python (python 3, numpy, scipy) files for converting pdb to input C code. 
+
+
+## Installation
+
+Simply download this repo by `git clone https://github.com/darrenjhsu/XSNAMD`
+on your machine. It creates a directory called XSNAMD/.
+
+
+
+
+### Example datasets / Tutorial
+
+Example datasets and a tutorial can be found in the example/ folder. The input
+files are prepared for you, so you can try out the program. Also see README
+within the example/ folder.
 
 
 ## Application workflow
@@ -100,11 +131,6 @@ Root Folder
 
 ```
 
-### Example datasets / Tutorial
-
-Example datasets and a tutorial can be found in the example/ folder. The input
-files are prepared for you, so you can try out the program. Also see README
-within the example/ folder.
 
 
 ### If you want to fit c, c1, and c2 with one starting strcuture and one static experimental measurement
