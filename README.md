@@ -57,42 +57,43 @@ This program is written in CUDA C and runs only on Nvidia GPUs. It assumes
 that you have access to an Nvidia GPU. At the time of writing, this code has
 been tested on K40, K80, and P100 cards.
 
-### Software
+### Software dependencies
 
-For some parts GNU Scientific Library (GSL) >= 2.5 is required. Your cluster
+For some parts **GNU Scientific Library (GSL) >= 2.5** is required. Your cluster
 may have it installed. In that case, set the path in the Makefile to it.
 Otherwise, you need to install a local copy of GSL and point to the directory
 in the Makefile. More on that in the Installation section 
 
-Nvidia's nvcc compiler is required. Consult your system administrator about
-cuda availability on your machine. 
+Nvidia's **nvcc** compiler is required. Consult your system administrator about
+cuda availability on your machine. At the time of writing we are using cuda/9.1.85. 
 
-SWIG interface is required. It's likely already installed on your machine. See
-`http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation` for more
-inforamtion about installing it on your server.  
+**SWIG >= 3.0.x** interface is required. It's likely already installed on your machine. 
+See `http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation` for more
+inforamtion about installing it locally on your server.
 
-There is a basic python (python 3, numpy, scipy) files for converting pdb to input C code. 
+There is a basic python (**python 3, numpy, scipy**) files for converting pdb to 
+input C code. You should not need an env for running the provided python script (input.py).
 
+Since the code is intended to be a module of NAMD, **NAMD (CUDA build)** should be 
+installed on your machine. This code is tested with NAMD 2.11-13.
 
 ## Installation
 
 Simply download this repo by `git clone https://github.com/darrenjhsu/XSNAMD`
-on your machine. It creates a directory called XSNAMD/.
+on your machine. It creates a directory called XSNAMD/ in your working directory.
 
-
-
+Now follow the README in example/ for more information.
 
 ### Example datasets / Tutorial
 
 Example datasets and a tutorial can be found in the example/ folder. The input
-files are prepared for you, so you can try out the program. Also see README
-within the example/ folder.
-
+files are prepared for you, so you can try out the program.
 
 ## Application workflow
 
-There are several steps. This is given that you work on a cluster with Nvidia
-GPU access, and that you use some sort of job submission system.
+The overall idea is to compile an XSMD.so which calculates X-ray scattering
+signal and derive force to act on each atom.
+
 
 ### File structures
 
@@ -109,6 +110,7 @@ Root Folder
 |           fit_traj_initial.out
 |           1e-5/
 |               XSMD.so
+|               backup_code/
 |   |---PROT2/
 |           # Similar structures as PROT1/
 |---data/
@@ -167,7 +169,7 @@ Root Folder
 
 ### If you have two known structures, and you want to test if the program can drive one structure to another
 
-Good for test runs. Manuals coming ...
+Good for test runs. Refer to the README in example/ for more information.
 
 ### If you have one known structure, a static measurement, and a difference signal to fit
 
@@ -205,19 +207,18 @@ average of that run to the static measurement. To do that see next section.
 
 1. When running NAMD, add these keywords in your NAMD config files.
 ```
-    tclForces           on
-    set opt             0             # 1 when you are ready to turn it on
-    tclforcesscript     XSMD.tcl      # See /doc/XSMD.tcl for details
-    set XSMDrestartFreq 5000          # Will write to .restart.XSMDscat and restart.XSMDEMA files 
-    set XSMDoutputName  $outputname
-    set XSMDrestart     0             # 1 if it's a continuing XSMD run
+    tclForces            on
+    set opt              0             # 1 when you are ready to turn it on
+    tclforcesscript      XSMD.tcl      # See /doc/XSMD.tcl for details
+    set XSMDrestartFreq  5000          # Will write to .restart.XSMDscat and restart.XSMDEMA files 
+    set XSMDoutputName   $outputname
+    set XSMDrestart      0             # 1 if it's a continuing XSMD run
     set XSMDrestartScat  $outputname.restart.XSMDscat
     set XSMDrestartEMA   $outputname.restart.XSMDEMA
     
 ```
 
-1. During the simulation, look at the log file. It should show the chi square
-   decreasing gradually. 
+During the simulation, look at the log file. It should show the chi square decreasing gradually. 
 
 
 ### If you have an equilibrium run of one protein, a static measurement, and a difference signal to fit
@@ -267,15 +268,15 @@ This is the ideal setting and is the typical case of a real application.
     set XSMDrestart     0             # 1 if it's a continuing XSMD run
 ```
 
-1. During the simulation, look at the log file. It should show the chi square
-   decreasing gradually. 
+During the simulation, look at the log file. It should show the chi square decreasing gradually. 
 
 ### Combining the XSMD simulations with metadynamics
 
 Manuals coming ...
 
 
-## Important source files
+
+## Important source files and where to find them
 
 ### `XSMD.cu`
 
@@ -303,20 +304,22 @@ tests if you use nvprof in the HPC job submission.)
 ### `mol_param.cu`
 
 Tells number of atoms and atom types. Atom types are defined in WaasKirf.cu and
-are used in the `FF_calc` kernel in `kernel.cu` 
+are used in the `FF_calc` kernel in `kernel.cu`. This file is different for
+every system you want to run simulations on.
 
 ### `env_param.cu`
 
 Tells some environmental parameters such as k the spring constant (that is 
 inherited all the way from the initial `input.py`) or rho the solvent electron
 density (0.334 for water at 20 deg C). delta\_t and tau are defined in the
-paper.
+paper. This file is different for every system you want to run simulations on.
 
 ### `scat_param.cu`
 
 Contains number of q points, c1, c2, c, scattering patterns of the
 reference structure (or ensemble run), the difference pattern scaled to the
 scattering magnitude of reference signal, and error of the difference signal
-also scaled. Note that c is not used in the actual calculation. 
+also scaled. Note that c is not used in the actual calculation. This file is
+different for every system you want to run simulations on.
 
 
