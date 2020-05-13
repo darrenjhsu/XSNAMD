@@ -34,7 +34,7 @@ Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper.
 
 ## Why use this program?
 
-1. It takes care of changing scattering intensity due to surface area
+1. It takes care of scattering intensity changes due to surface area
    variation. This is necessary if you have an (un)folding process to explore.
    For example, a study focussing on molten globule state will benefit a lot.
 
@@ -99,6 +99,12 @@ Root Folder
 |       *.cu files
 
 ```
+
+### Example datasets / Tutorial
+
+Example datasets and a tutorial can be found in the example/ folder. The input
+files are prepared for you, so you can try out the program. Also see README
+within the example/ folder.
 
 
 ### If you want to fit c, c1, and c2 with one starting strcuture and one static experimental measurement
@@ -173,12 +179,15 @@ average of that run to the static measurement. To do that see next section.
 
 1. When running NAMD, add these keywords in your NAMD config files.
 ```
-    tclForces        on
+    tclForces           on
     set opt             0             # 1 when you are ready to turn it on
     tclforcesscript     XSMD.tcl      # See /doc/XSMD.tcl for details
-    set XSMDrestartFreq 5000          # Will write to .XSMDscat and .XSMDEMA files 
+    set XSMDrestartFreq 5000          # Will write to .restart.XSMDscat and restart.XSMDEMA files 
     set XSMDoutputName  $outputname
     set XSMDrestart     0             # 1 if it's a continuing XSMD run
+    set XSMDrestartScat  $outputname.restart.XSMDscat
+    set XSMDrestartEMA   $outputname.restart.XSMDEMA
+    
 ```
 
 1. During the simulation, look at the log file. It should show the chi square
@@ -187,7 +196,7 @@ average of that run to the static measurement. To do that see next section.
 
 ### If you have an equilibrium run of one protein, a static measurement, and a difference signal to fit
 
-This is the ideal setting.
+This is the ideal setting and is the typical case of a real application.
 
 1. Assuming the input data are prepared in data/PROT1/, where PROT1 is your 
    protein's name.
@@ -284,14 +293,4 @@ reference structure (or ensemble run), the difference pattern scaled to the
 scattering magnitude of reference signal, and error of the difference signal
 also scaled. Note that c is not used in the actual calculation. 
 
-
-<!--Of the files, 
-
-Init\_calc.cu       calculates with given two sets of coordinates, the scattering pattern for reference (S\_ref) and for initial (S\_init) structures, and then compute the difference (dS = S\_ref - S\_init)
-
-raster.cu          specifies parameters. 
-kernel.cu          is the workhorse of the package.
-XSMD.cu            is where the code NAMD calls every step is in.
-speedtest.cu       is to test new features. 
--->
 
