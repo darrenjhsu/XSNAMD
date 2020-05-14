@@ -36,7 +36,7 @@ cuda`. Yours may differ.
 
 1. Do `./make_input` to copy all .cu files to src/ and .hh files to include/.
 
-1. Build the file with `make DSET=Ala10 KCHI=1e-5`. This file will be placed in
+1. Build the file with `make DSET=Ala10 KCHI=1e-5`. The file will be placed in
    `bin/Ala/1e-5/XSMD.so` along with the backup code. You need the swig
    interface to be able to compile the wrap file. If you don't have swig
    installed globally, you can install it locally and include that to your
@@ -71,5 +71,7 @@ cuda`. Yours may differ.
    prepare a submission script in which you issue `namd2` to run simulations.
 
 1. Inspect the log file ({YOURSYSTEM}\_XSMD\_0.log) 
-   You should see the chi square output in the log file.
-
+   You should see the chi square output in the log file. The chi square should
+   decrease dramatically when the force starts to ramp up. The convex contact area 
+   should drop from 185 A^2 to 147 A^2 for the Ala10 system. 
+   You can use other python packages to analyze the trajectory. 

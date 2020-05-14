@@ -76,6 +76,7 @@ input C code. You should not need an env for running the provided python script 
 
 Since the code is intended to be a module of NAMD, **NAMD (CUDA build)** should be 
 installed on your machine. This code is tested with NAMD 2.11-13.
+You need to know the path to executable `namd2`.
 
 ## Installation
 
@@ -134,6 +135,12 @@ Root Folder
 ```
 
 
+## Application scenarios
+
+### If you have two known structures, and you want to test if the program can drive one structure to another
+
+Good for test runs. Refer to the README in example/ for more information.
+
 
 ### If you want to fit c, c1, and c2 with one starting strcuture and one static experimental measurement
 
@@ -167,9 +174,6 @@ Root Folder
    scattering potential, and DSET is the name of your dataset.
 
 
-### If you have two known structures, and you want to test if the program can drive one structure to another
-
-Good for test runs. Refer to the README in example/ for more information.
 
 ### If you have one known structure, a static measurement, and a difference signal to fit
 
@@ -260,12 +264,14 @@ This is the ideal setting and is the typical case of a real application.
 
 1. When running NAMD, add these keywords in your NAMD config files.
 ```
-    tclForces        on
-    set opt             0             # 1 when you are ready to turn it on
-    tclforcesscript     XSMD.tcl      # See /doc/XSMD.tcl for details
-    set XSMDrestartFreq 5000          # Will write to .XSMDscat and .XSMDEMA files 
-    set XSMDoutputName  $outputname
-    set XSMDrestart     0             # 1 if it's a continuing XSMD run
+    tclForces            on
+    set opt              0             # 1 when you are ready to turn it on
+    tclforcesscript      XSMD.tcl      # See /doc/XSMD.tcl for details
+    set XSMDrestartFreq  5000          # Will write to .XSMDscat and .XSMDEMA files 
+    set XSMDoutputName   $outputname
+    set XSMDrestart      0             # 1 if it's a continuing XSMD run
+    set XSMDrestartScat  $outputname.restart.XSMDscat
+    set XSMDrestartEMA   $outputname.restart.XSMDEMA
 ```
 
 During the simulation, look at the log file. It should show the chi square decreasing gradually. 
