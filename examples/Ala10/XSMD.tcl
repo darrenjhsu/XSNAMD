@@ -7,7 +7,7 @@ set numatoms 104
 # Number of q points; look at your scattering profile and change accordingly
 set num_q 301
 
-# Load the code for calculating scattering patterns and force.s
+# Load the code for calculating scattering patterns and forces.
 # Change to wherever the XSMD.so is.
 load ../bin/Ala10/1e-5/XSMD.so XSMD
 

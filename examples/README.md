@@ -45,14 +45,15 @@ cuda`. Yours may differ.
 
 ## Run a simulation with XSMD.so attached to it
 
-1. Edit the XSMD.tcl so that the XSMD path is correctly put in. The result
-   looks like `load path/to/your/XSMD.so XSMD`
+1. Edit the XSMD.tcl by `vim XSMD.tcl` so that the XSMD path is correctly put in.
+   The line you need to change is under `# Change to wherever the XSMD.so is.`
+   The result looks like `load path/to/your/XSMD.so XSMD`
 
 1. Edit the {YOURSYSTEM}\_XSMD\_0.conf. Make sure these parameters are correct:
    ```
    tclforces           on
    set opt             0
-   tclforcesscript     XSMD.tcl
+   tclforcesscript     XSMD.tcl    ;# Relative path to where this config file is
    ```
    as well as 
    ```
