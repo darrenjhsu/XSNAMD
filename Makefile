@@ -30,8 +30,8 @@ REFPARAMSOBJ := $(patsubst $(DATA)/%, $(BUILDDIR)/%, $(REFPARAMS:.$(SRCEXT)=.o))
 CFLAGS := --compiler-options='-fPIC' -use_fast_math -lineinfo --ptxas-options=-v
 LIB := -lgsl -lgslcblas -lm
 INC := -Iinclude -Idata/$(DSET)
-GSLINC := -I/home/djh992/lib/gsl/include
-GSLLIB := -L/home/djh992/lib/gsl/lib
+GSLINC := #-I/YOUR_GSL_INCLUDE
+GSLLIB := #-L/YOUR_GSL_LIB
 
 
 $(TARGET): $(BUILDDIR)/XSMD_wrap.o $(PARAMSOBJ) $(DATAPARAMSOBJ) $(SCATPARAMSOBJ)
