@@ -1,4 +1,10 @@
+
 sync_to_working_code.sh
+*.cxx
+*.swo
+*.swp
+
+
 # Prerequisites
 *.d
 
