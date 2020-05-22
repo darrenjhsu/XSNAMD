@@ -80,7 +80,8 @@ You need to know the path to executable `namd2`.
 
 **Note about NAMD 2.12 and 2.13**: It seems that the pre-built binary version
 of NAMD 2.12 and 2.13 (both multicore-CUDA and ibverbs builds) have a different
-behavior when its TCL script loads `XSMD.so`. To run on those versions you need
+behavior when its TCL script loads `XSMD.so` which generates errors regarding
+undefined symbols such as `Tcl_GetStringFromObj`. To run on those versions you need
 to compile the NAMD from source code using the TCL library they provide.
 Basically follow the instruction in their release note.
 
