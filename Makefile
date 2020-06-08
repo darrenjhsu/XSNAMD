@@ -33,8 +33,15 @@ INC := -Iinclude -Idata/$(DSET)
 GSLINC := #-I/YOUR_GSL_INCLUDE
 GSLLIB := #-L/YOUR_GSL_LIB
 
+ifndef DSET
+$(error DSET is not set. DSET points to the directory e.g. DSET=1aki if data is in /data/1aki/)
+endif
+
 
 $(TARGET): $(BUILDDIR)/XSMD_wrap.o $(PARAMSOBJ) $(DATAPARAMSOBJ) $(SCATPARAMSOBJ)
+	ifndef KCHI
+	$(error KCHI is not set. Input a string for spring constant)
+	endif
 	@mkdir -p bin/$(DSET)/$(KCHI)
 	@mkdir -p bin/$(DSET)/$(KCHI)/backup_code
 	$(CC) -shared $^ -o $(TARGET)
