@@ -1,48 +1,34 @@
 
 ## Driving an MD structure to another with SAXS signal.
 
-This project is to use GPU to accelerate X-ray scattering calculation with
-Debye formula looping over atoms and use it in MD simulation. Concepts were 
-taken from Bjorling et al. JCTC 2015, 11, 780 and exponential moving average is
-taken from Chen & Hub, Biophysics J, 2015. 
+### Problem statment 
+In time-resolved X-ray solution scattering, researchers
+obtain difference signal as a function of system evolution. In my case, a
+protein assumes different states and gives distinct difference scattering
+signals. We want to find some structures that give the difference signal that
+matches the difference.
 
-In short, at each interval we evaluate the scattering profile, and take the
-negative gradient (definition of force) of chi square, which is a function of
-all coordinates (only). 
+### What's being done 
+We input the X-ray scattering signal as a
+constraint in the MD simulation. The program calculates X-ray scattering
+signals at each snapshot, compare it to the reference signal and calculate the
+difference signal. It then compare the difference signal to the input one, and
+it uses the deviation to derive force that acts on each atom. The math is
+described in our paper ([J. Chem. Phys, 2020, 152,
+204115](https://doi.org/10.1063/5.0007158). 
 
-The calculation of scattering profile is the same as in FoXS but the form 
-factors are calculated explicitly. The solvation shell contrast coefficient is
-currently set as adjustable just as in FoXS: Schneidman-Duhovny et al, NAR 2010.
-<!-- not uniform. It is with HyPred approach (radial sum of electron density
-difference up to vdW radii + 3 A). -->
-
-The atomic form factors in vacuum are calculated using Waasmaier-Kirfel table.
-
-The volume for dummy atom calcualtion were taken from Svergun 1995 J Appl 
-Crystallgr paper, which refers to Fraser 1978 J Appl Crystallgr paper and 
-International Tables for X-ray Crystallography (1968). 
-
-
-The surface area calculation is done numerically following J Appl Crystallgr 
-1983 Connolly "Analytical Molecular Surface Calculation." Rasterized points 
-sample the vdW sphere, which has to be outside of any other vdW spheres of 
-other atoms. Extended by solvent radius, the point (solvent center) must also 
-be far enough from the vdW spheres of other atoms.
-
-In the surface area calculation part the spiral generating function is from 
-Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper. 
 
 ## Why use this program?
 
 1. It takes care of scattering intensity changes due to surface area
    variation. This is necessary if you have an (un)folding process to explore.
-   For example, a study focussing on molten globule state will benefit a lot.
+   For example, a study focusing on molten globule states will benefit a lot.
 
 1. It is fast. If force is evaluated every 50 steps, the computational
-   overhead is almost negligible.
+   overhead is about 3 - 4 %.
 
 1. Only one simulation box is required. You solvate the protein, equlibrate it,
-   fit to the static scattering data, and then fit the difference data.
+   fit to the static scattering data, and then fit to the difference data.
 
 1. It is compatible with some enhanced sampling methods such as metadynamics.
    This again comes in handy when exploring the conformational space for an
@@ -62,13 +48,14 @@ been tested on K40, K80, and P100 cards.
 For some parts **GNU Scientific Library (GSL) >= 2.5** is required. Your cluster
 may have it installed. In that case, set the path in the Makefile to it.
 Otherwise, you need to install a local copy of GSL and point to the directory
-in the Makefile. More on that in the Installation section 
+in the Makefile. More on that in the Installation section. 
 
 Nvidia's **nvcc** compiler is required. Consult your system administrator about
 cuda availability on your machine. At the time of writing we are using cuda/9.1.85. 
 
 **SWIG >= 3.0.x** interface is required. It's likely already installed on your machine. 
-See `http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation` for more
+See [SWIG
+website](http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation) for more
 inforamtion about installing it locally on your server.
 
 There is a basic python (**python 3, numpy, scipy**) files for converting pdb to 
@@ -90,7 +77,7 @@ Basically follow the instruction in their release note.
 Simply download this repo by `git clone https://github.com/darrenjhsu/XSNAMD`
 on your machine. It creates a directory called XSNAMD/ in your working directory.
 
-Now follow the README in example/ for more information.
+Now follow the READMEs in both root directory and example/ for more information.
 
 ### Example datasets / Tutorial
 
@@ -335,4 +322,36 @@ scattering magnitude of reference signal, and error of the difference signal
 also scaled. Note that c is not used in the actual calculation. This file is
 different for every system you want to run simulations on.
 
+### Under the hood
+
+This project is to use GPU to accelerate X-ray scattering calculation with
+Debye formula looping over atoms and use it in MD simulation. Concepts were 
+taken from Bjorling et al. JCTC 2015, 11, 780 and exponential moving average is
+taken from Chen & Hub, Biophysics J, 2015. 
+
+In short, at each interval we evaluate the scattering profile, and take the
+negative gradient (definition of force) of chi square, which is a function of
+all coordinates (only). 
+
+The calculation of scattering profile is the same as in FoXS but the form 
+factors are calculated explicitly. The solvation shell contrast coefficient is
+currently set as adjustable just as in FoXS: Schneidman-Duhovny et al, NAR 2010.
+<!-- not uniform. It is with HyPred approach (radial sum of electron density
+difference up to vdW radii + 3 A). -->
+
+The atomic form factors in vacuum are calculated using Waasmaier-Kirfel table.
+
+The volume for dummy atom calcualtion were taken from Svergun 1995 J Appl 
+Crystallgr paper, which refers to Fraser 1978 J Appl Crystallgr paper and 
+International Tables for X-ray Crystallography (1968). 
+
+
+The surface area calculation is done numerically following J Appl Crystallgr 
+1983 Connolly "Analytical Molecular Surface Calculation." Rasterized points 
+sample the vdW sphere, which has to be outside of any other vdW spheres of 
+other atoms. Extended by solvent radius, the point (solvent center) must also 
+be far enough from the vdW spheres of other atoms.
+
+In the surface area calculation part the spiral generating function is from 
+Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper. 
 

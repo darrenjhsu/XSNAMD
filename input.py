@@ -1,4 +1,8 @@
 
+
+### This file helps you prepare the input files including 
+### mol_param.cu/hh, coord_ref.cu/hh, expt_data.cu/hh, and env_param.cu/hh
+
 import numpy as np
 import os.path
 import re
@@ -7,21 +11,8 @@ import platform
 import scipy.signal as sig
 from scipy import interpolate
 
-print(platform.python_version())
 
-def next_2048(x):
-    #return 1 if x == 0 else int(2**math.ceil(math.log(x,2)))
-    print(((x+2047)/2048)*2048)
-    return (((x+2047)/2048)*2048)
-
-
-
-## Specify parameters
-
-# Driving modes. Driving the initial structure to
-# 'c': another crystal strcuture, 't': an average of trajectory,
-# 's': static SAXS signal, 'd': difference SAXS signal
-driving_mode = 's'
+## Specify parameters (edit as you see fit)
 
 # Initial PDB and PSF files
 data_path = 'data/1f6s_3/'
@@ -41,10 +32,12 @@ S_exp_file = data_path + 'S_exp60.txt'
 dS_exp_file = data_path + 'dS_exp60_full_SADS.txt'
 
 # Unit of the q vector. If your data is from SASBDB, it is probably 1 / nm.
+# If your data is collected at BioCARS it is probably 'A'
+# This program works in A
 q_unit = 'A' # Options: 'nm' or 'A'
 
-num_dS = 1   # Number of dS components. Has no effect when driving mode is not set to 'd'
-alpha = 1    # Excitation fraction
+has_dS = 1   # If the data contains a dS component. 
+alpha = 1    # Excitation fraction. If 10 % of molecule is excited, then alpha = 0.1
 
 # Experimental data has error estimate? (1 or 0)
 has_S_err = 1
@@ -68,15 +61,25 @@ k_chi = 5e-7
 # number of raster points to determine surface area (better be power of 2)
 num_raster = 512
 
-# Snapshots per delta_t steps for exponential moving averaging
-# Memory time tau steps
+# The program performs exponential moving averaging (see Chen and Hub, 2015) 
+# by calculating the X-ray scattering signal every delta_t steps and with a tau memory time.
+# It seems that delta_t = 50 and tau = 5000 works okay.
 delta_t = 50
 tau = 5000
 
+#######################################################################################
+################## The rest you probably don't need to modify #########################
+#######################################################################################
 
-##### The rest you probably don't need to modify #####
+def next_2048(x):
+    #return 1 if x == 0 else int(2**math.ceil(math.log(x,2)))
+    print(((x+2047)/2048)*2048)
+    return (((x+2047)/2048)*2048)
 
-
+# Driving modes. Driving the initial structure to
+# 'c': another crystal strcuture, 't': an average of trajectory,
+# 's': static SAXS signal, 'd': difference SAXS signal
+driving_mode = 's'
 # Parse files
 
 with open(fpsf) as f:
@@ -136,7 +139,7 @@ for x in PSF:
     if '!NATOM' in x:
         NATOM = int(re.search(r'\d+', x).group())
         if NATOM != num_atom:
-            print('!!!!!! NATOM is larger than num_atom, check if this is a solvated model or you typed wrong num_atom!')
+            raise ValueError('NATOM does not equal num_atom, check if this is a solvated model (NATOM will be larger than num_atom) or you typed wrong num_atom! No output file is prepared.')
         print(NATOM)
         atoms = np.zeros((NATOM,3))
         Ele = np.zeros((NATOM,1),dtype=int)
