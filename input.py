@@ -48,11 +48,14 @@ num_q_down_to = 75 # Apply decimate() to downsample the curve to less than this 
 
 # Upper and lower bound of q
 use_diff_q_range = 1 # Simply use q range from difference file; overwrites ql and qu below
-                     # It is however useful to set the ql and qu in case of fallback. 
+                     # It is however useful to set the ql and qu in case of fallback.
+                     # For BioCARS data if the qu is > 1 / A then the program may suffer
+                     # from pink beam smearing. Consult BioCARS for more information.
 ql = 0.03
 qu = 0.7
 
 # Solvent electron density (rho, for pure water at 20 deg C it is 0.334)
+# Calculate yours separately
 rho = 0.334 * 0.98545 # 55.5 deg C density
 
 # k chi - weighing factor
