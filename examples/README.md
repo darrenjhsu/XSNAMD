@@ -32,15 +32,20 @@ its substrate) to 2lao.
 You need to load the nvcc compiler. On our local cluster we used `module load
 cuda`. Yours may differ.
 
-1. Edit the `make_input`: `data_path=data/Ala10`. Save the file.
+<!--1. Edit the `make_input`: `data_path=data/Ala10`. Save the file.
 
-1. Do `./make_input` to copy all .cu files to src/ and .hh files to include/.
+1. Do `./make_input` to copy all .cu files to src/ and .hh files to include/.-->
 
-1. Build the file with `make DSET=Ala10 KCHI=1e-5`. The file will be placed in
-   `bin/Ala/1e-5/XSMD.so` along with the backup code. You need the swig
+1. Build the file with `make DSET=<YOURSYSTEM> KCHI=1e-5`. The file will be placed in
+   `bin/<YOURSYSTEM>/1e-5/XSMD.so` along with the backup code. You need the swig
    interface to be able to compile the wrap file. If you don't have swig
    installed globally, you can install it locally and include that to your
    path. (`export PATH=$PATH:/path/to/swig`)
+   
+   For example, `make DSET=Ala10 KCHI=1e-5` will generate `bin/Ala10/1e-5/XSMD.so`
+   Note that the KCHI=1e-5 here is merely a name. The actual k\_chi used in the simulation
+   is defined in the env\_param.cu. You can name it to whatever valid path;
+   I sometimes use the initial X-ray scattering potential (KCHI=20kcal) as the name.
 
 
 ## Run a simulation with XSMD.so attached to it
@@ -54,14 +59,14 @@ cuda`. Yours may differ.
    tclforces           on
    set opt             0
    tclforcesscript     XSMD.tcl    ;# Relative path to where this config file is
-   ```
-   as well as 
-   ```
+
    set XSMDrestartFreq  5000
    set XSMDoutputName   $outputname
    set XSMDrestart      0   ;# new XSMD simulation
+   if {$XSMDrestart} {
    set XSMDrestartScat  $outputname.restart.XSMDscat
    set XSMDrestartEMA   $outputname.restart.XSMDEMA
+   }
    ```
 
 1. Run simulation. The method to run NAMD simulations differs a lot across
@@ -75,4 +80,4 @@ cuda`. Yours may differ.
    You should see the chi square output in the log file. The chi square should
    decrease dramatically when the force starts to ramp up. The convex contact area 
    should drop from 185 A^2 to 147 A^2 for the Ala10 system. 
-   You can use other python packages to analyze the trajectory. 
+   You can use other python packages such as MDAnalysis to analyze the trajectory. 
