@@ -107,7 +107,7 @@ XSNAMD/
 |           speedtest.out
 |           fit_initial.out
 |           fit_traj_initial.out
-|           1e-5/
+|           1e-5/            # Each k_chi will have its own directory. Might change.
 |               XSMD.so
 |               backup_code/
 |   |---PROT2/
@@ -193,9 +193,9 @@ average of that run to the static measurement for c, c1 and c2. To do that see n
 1. Run `python input.py` to parse the PDB and PSF files and generate
    `mol_param.cu/hh` and `coord_ref.cu/hh`
 
-1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
+<!--1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
    script file, and execute it by `./make_input` to copy the .cu/hh files from
-   /data/PROT1 to /src .    
+   /data/PROT1 to /src .    -->
 
 1. Run `make fit DSET=PROT1` to compile `fit_initial.cu`
 
@@ -235,7 +235,7 @@ This is the ideal setting and is the typical case of a real application.
    protein's name.
 
 1. An input python file **input.py** contains pointers to the PDB and PSF 
-   files (that you probably generated through `<psfgen`> in VMD), scattering
+   files (that you probably generated through `psfgen` in VMD), scattering
    profiles (q, S\_q, dS\_q and S\_err if you have it), and a few parameters. 
    This is the file to edit when changing the parameters. Please refer to the
    comments and instructions in the file.
@@ -247,9 +247,9 @@ This is the ideal setting and is the typical case of a real application.
    to calculate the scattering pattern) from the equilibrium run as a
    multiframe xyz file named `trajectory.xyz` to the root folder.
 
-1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
+<!--1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
    script file, and execute it by `./make_input` to copy the .cu/hh files from
-   /data/PROT1 to /src .    
+   /data/PROT1 to /src .    -->
 
 1. Run `make fit_traj DSET=PROT1` to compile `fit_traj_initial.cu`
 
