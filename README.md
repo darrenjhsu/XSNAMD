@@ -1,48 +1,33 @@
 
 ## Driving an MD structure to another with SAXS signal.
 
-This project is to use GPU to accelerate X-ray scattering calculation with
-Debye formula looping over atoms and use it in MD simulation. Concepts were 
-taken from Bjorling et al. JCTC 2015, 11, 780 and exponential moving average is
-taken from Chen & Hub, Biophysics J, 2015. 
+### Problem statment 
+In time-resolved X-ray solution scattering, researchers
+obtain difference signal as a function of system evolution. In my case, a
+protein assumes different states and gives distinct difference scattering
+signals. We want to find some structures that give the difference signal that
+match the difference signal.
 
-In short, at each interval we evaluate the scattering profile, and take the
-negative gradient (definition of force) of chi square, which is a function of
-all coordinates (only). 
+### What's being done 
+We input the X-ray scattering signal as a
+constraint in the MD simulation. The program calculates X-ray scattering
+signals at each defined snapshot, compare it to the reference signal and calculate the
+difference signal. It then compare the calculated difference signal to the input one, and
+it uses the deviation between them to derive force that acts on each atom. The math is
+described in [our paper](https://doi.org/10.1063/5.0007158). 
 
-The calculation of scattering profile is the same as in FoXS but the form 
-factors are calculated explicitly. The solvation shell contrast coefficient is
-currently set as adjustable just as in FoXS: Schneidman-Duhovny et al, NAR 2010.
-<!-- not uniform. It is with HyPred approach (radial sum of electron density
-difference up to vdW radii + 3 A). -->
-
-The atomic form factors in vacuum are calculated using Waasmaier-Kirfel table.
-
-The volume for dummy atom calcualtion were taken from Svergun 1995 J Appl 
-Crystallgr paper, which refers to Fraser 1978 J Appl Crystallgr paper and 
-International Tables for X-ray Crystallography (1968). 
-
-
-The surface area calculation is done numerically following J Appl Crystallgr 
-1983 Connolly "Analytical Molecular Surface Calculation." Rasterized points 
-sample the vdW sphere, which has to be outside of any other vdW spheres of 
-other atoms. Extended by solvent radius, the point (solvent center) must also 
-be far enough from the vdW spheres of other atoms.
-
-In the surface area calculation part the spiral generating function is from 
-Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper. 
 
 ## Why use this program?
 
 1. It takes care of scattering intensity changes due to surface area
    variation. This is necessary if you have an (un)folding process to explore.
-   For example, a study focussing on molten globule state will benefit a lot.
+   For example, a study focusing on molten globule states will benefit a lot.
 
 1. It is fast. If force is evaluated every 50 steps, the computational
-   overhead is almost negligible.
+   overhead is about 3 - 4 %.
 
 1. Only one simulation box is required. You solvate the protein, equlibrate it,
-   fit to the static scattering data, and then fit the difference data.
+   fit to the static scattering data, and then fit to the difference data.
 
 1. It is compatible with some enhanced sampling methods such as metadynamics.
    This again comes in handy when exploring the conformational space for an
@@ -55,23 +40,24 @@ Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper.
 
 This program is written in CUDA C and runs only on Nvidia GPUs. It assumes
 that you have access to an Nvidia GPU. At the time of writing, this code has
-been tested on K40, K80, and P100 cards.
+been tested on K40, K80, P100, and Quadro 6000 cards.
 
 ### Software dependencies
 
-For some parts **GNU Scientific Library (GSL) >= 2.5** is required. Your cluster
+1. For some parts **GNU Scientific Library (GSL) >= 2.5** is required. Your cluster
 may have it installed. In that case, set the path in the Makefile to it.
 Otherwise, you need to install a local copy of GSL and point to the directory
-in the Makefile. More on that in the Installation section 
+in the Makefile. More on that in the Installation section. 
 
-Nvidia's **nvcc** compiler is required. Consult your system administrator about
+1. Nvidia's **nvcc** compiler is required. Consult your system administrator about
 cuda availability on your machine. At the time of writing we are using cuda/9.1.85. 
 
-**SWIG >= 3.0.x** interface is required. It's likely already installed on your machine. 
-See `http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation` for more
+1. **SWIG >= 3.0.x** interface is required. It's likely already installed on your machine. 
+See [SWIG
+website](http://www.swig.org/Doc3.0/Preface.html#Preface_unix_installation) for more
 inforamtion about installing it locally on your server.
 
-There is a basic python (**python 3, numpy, scipy**) files for converting pdb to 
+1. There is a basic python (**python 3, numpy, scipy**) files for converting pdb to 
 input C code. You should not need an env for running the provided python script (input.py).
 
 Since the code is intended to be a module of NAMD, **NAMD (CUDA build)** should be 
@@ -90,23 +76,28 @@ Basically follow the instruction in their release note.
 Simply download this repo by `git clone https://github.com/darrenjhsu/XSNAMD`
 on your machine. It creates a directory called XSNAMD/ in your working directory.
 
-Now follow the README in example/ for more information.
+Now follow the READMEs in both root directory and example/ for more information.
 
 ### Example datasets / Tutorial
 
 Example datasets and a tutorial can be found in the example/ folder. The input
 files are prepared for you, so you can try out the program.
 
-## Application workflow
+## Basic application workflow
 
-The overall idea is to compile an XSMD.so which calculates X-ray scattering
-signal and derive force to act on each atom.
+1. Prepare a run-able NAMD simulation system (see [NAMD tutorials](http://www.ks.uiuc.edu/Training/Tutorials/namd-index.html)
+for more information if you are not familiar with NAMD simulations)
+
+1. After that, prepare (see below) experimental data so that you can compile the `XSMD.so` file.
+
+1. Re-run the NAMD simulation with tclForce turned on and points to the `XSMD.so`
+while running simulations.
 
 
 ### File structures
 
 ```
-Root Folder
+XSNAMD/
 |   input.py
 |   make_input
 |   Makefile
@@ -146,10 +137,12 @@ Root Folder
 
 ### If you have two known structures, and you want to test if the program can drive one structure to another
 
-Good for test runs. Refer to the README in example/ for more information.
+You will calculate the scattering signals from both structures and prepare a mock dataset of q, S\_ref, and dS.
+
+Good for test runs and for understanding how the program works. Refer to the README in example/ for more information.
 
 
-### If you want to fit c, c1, and c2 with one starting strcuture and one static experimental measurement
+<!-- ### If you want to fit c, c1, and c2 with one starting strcuture and one static experimental measurement
 
 1. Assuming the input data are prepared in data/PROT1/, where PROT1 is your 
    protein's name.
@@ -179,25 +172,26 @@ Good for test runs. Refer to the README in example/ for more information.
 
    KCHI is the spring constant that you determine the magnitude of the X-ray
    scattering potential, and DSET is the name of your dataset.
-
+-->
 
 
 ### If you have one known structure, a static measurement, and a difference signal to fit
 
-It is encouraged that you do an equilibrium run for the structure and fit the
-average of that run to the static measurement. To do that see next section.
+It is encouraged that you at least do an equilibrium run for the structure and fit the
+average of that run to the static measurement for c, c1 and c2. To do that see next section.
 
 1. Assuming the input data are prepared in data/PROT1/, where PROT1 is your 
    protein's name.
 
 1. An input python file **input.py** contains pointers to the PDB and PSF 
-   files (that you probably generated through `<psfgen`> in VMD), scattering
-   profiles (q, S\_q, dS\_q and S\_err if you have it), and a few parameters. 
+   files (that you probably generated through `psfgen` in VMD), absolute scattering
+   profiles (q, S(q), Serr(q)), difference scattering profiles (q, dS(q), and dSerr(q)) 
+   if you have it, and a few parameters. 
    This is the file to edit when changing the parameters. Please refer to the
    comments and instructions in the file.
 
 1. Run `python input.py` to parse the PDB and PSF files and generate
-   `mol_param.cu/hh` and `coord_ref.cu/hh`. 
+   `mol_param.cu/hh` and `coord_ref.cu/hh`
 
 1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
    script file, and execute it by `./make_input` to copy the .cu/hh files from
@@ -224,9 +218,10 @@ average of that run to the static measurement. To do that see next section.
     set XSMDrestartFreq  5000          # Will write to .restart.XSMDscat and restart.XSMDEMA files 
     set XSMDoutputName   $outputname
     set XSMDrestart      0             # 1 if it's a continuing XSMD run
-    set XSMDrestartScat  $outputname.restart.XSMDscat
-    set XSMDrestartEMA   $outputname.restart.XSMDEMA
-    
+    if {$XSMDrestart} {
+        set XSMDrestartScat  $outputname.restart.XSMDscat
+        set XSMDrestartEMA   $outputname.restart.XSMDEMA
+    }
 ```
 
 During the simulation, look at the log file. It should show the chi square decreasing gradually. 
@@ -277,8 +272,10 @@ This is the ideal setting and is the typical case of a real application.
     set XSMDrestartFreq  5000          # Will write to .XSMDscat and .XSMDEMA files 
     set XSMDoutputName   $outputname
     set XSMDrestart      0             # 1 if it's a continuing XSMD run
-    set XSMDrestartScat  $outputname.restart.XSMDscat
-    set XSMDrestartEMA   $outputname.restart.XSMDEMA
+    if {$XSMDrestart} {
+        set XSMDrestartScat  $outputname.restart.XSMDscat
+        set XSMDrestartEMA   $outputname.restart.XSMDEMA
+    }
 ```
 
 During the simulation, look at the log file. It should show the chi square decreasing gradually. 
@@ -335,4 +332,36 @@ scattering magnitude of reference signal, and error of the difference signal
 also scaled. Note that c is not used in the actual calculation. This file is
 different for every system you want to run simulations on.
 
+## Under the hood
+
+This project is to use GPU to accelerate X-ray scattering calculation with
+Debye formula looping over atoms and use it in MD simulation. Concepts were 
+taken from Bjorling et al. JCTC 2015, 11, 780 and exponential moving average is
+taken from Chen & Hub, Biophysics J, 2015. 
+
+In short, at each interval we evaluate the scattering profile, and take the
+negative gradient (definition of force) of chi square, which is a function of
+all coordinates (only). 
+
+The calculation of scattering profile is the same as in FoXS but the form 
+factors are calculated explicitly. The solvation shell contrast coefficient is
+currently set as adjustable just as in FoXS: Schneidman-Duhovny et al, NAR 2010.
+<!-- not uniform. It is with HyPred approach (radial sum of electron density
+difference up to vdW radii + 3 A). -->
+
+The atomic form factors in vacuum are calculated using Waasmaier-Kirfel table.
+
+The volume for dummy atom calcualtion were taken from Svergun 1995 J Appl 
+Crystallgr paper, which refers to Fraser 1978 J Appl Crystallgr paper and 
+International Tables for X-ray Crystallography (1968). 
+
+
+The surface area calculation is done numerically following J Appl Crystallgr 
+1983 Connolly "Analytical Molecular Surface Calculation." Rasterized points 
+sample the vdW sphere, which has to be outside of any other vdW spheres of 
+other atoms. Extended by solvent radius, the point (solvent center) must also 
+be far enough from the vdW spheres of other atoms.
+
+In the surface area calculation part the spiral generating function is from 
+Bauer 1998 Guidance Navigation and Control Conference and Exhibit paper. 
 
