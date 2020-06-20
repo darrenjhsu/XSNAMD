@@ -236,7 +236,13 @@ float fit_S_exp_to_S_calc_log(float *S_calc, float *S_exp, float *S_err, float *
 }
 
 
-int main () {
+int main (int argc, char* argv[]) {
+// argv[1]: Beginning of c1 range
+// argv[2]: Step of c1 scan
+// argv[3]: Ending of c1 range
+// argv[4]: Beginning of c2 range
+// argv[5]: Step of c2 scan
+// argv[6]: Ending of c2 range
     cudaFree(0);
     float *S_calc;
 
@@ -361,16 +367,19 @@ int main () {
     float sigma2 = 1.0;
     float alpha = 1.0;
 
-    float c1_init   = 0.96;
+    /*float c1_init   = 0.96;
     float c1_step   = 0.02;
-    float c1_end    = 1.06;
+    float c1_end    = 1.06;*/
+    float c1_init   = atof(argv[1]);
+    float c1_step   = atof(argv[2]);
+    float c1_end    = atof(argv[3]);
     /*float c1_init   = 1.00;
     float c1_step   = 0.002;
     float c1_end    = 1.00;*/
     int c1_step_num = (int)((c1_end - c1_init) / c1_step + 1.0);
-    float c2_init   = 0.0;
-    float c2_step   = 0.4;
-    float c2_end    = 3.2;
+    float c2_init   = atof(argv[4]);
+    float c2_step   = atof(argv[5]);
+    float c2_end    = atof(argv[6]);
     /*float c2_init   = 2.0;
     float c2_step   = 0.1;
     float c2_end    = 2.0;*/

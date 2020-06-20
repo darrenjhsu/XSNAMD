@@ -3,16 +3,10 @@
 ### This file helps you prepare the input files including 
 ### mol_param.cu/hh, coord_ref.cu/hh, expt_data.cu/hh, and env_param.cu/hh
 
-import numpy as np
-import os.path
-import re
-import math
-import platform
-import scipy.signal as sig
-from scipy import interpolate
 
-
-## Specify parameters (edit as you see fit)
+################################################################
+######## Specify parameters (edit as you see fit) ##############
+################################################################
 
 # Initial PDB and PSF files
 data_path = 'data/1f6s_3/'
@@ -58,11 +52,11 @@ qu = 0.7
 # Calculate yours separately
 rho = 0.334 * 0.98545 # 55.5 deg C density
 
-# k chi - weighing factor
+# k chi - weighing factor. Multiply this with the chi square and you get the 
+# amount of X-ray scattering-derived potential in kcal/mol. You can edit this in the 
+# /data/{YOURSYSTEM}/env_param.cu
 k_chi = 5e-7
 
-# number of raster points to determine surface area (better be power of 2)
-num_raster = 512
 
 # The program performs exponential moving averaging (see Chen and Hub, 2015) 
 # by calculating the X-ray scattering signal every delta_t steps and with a tau memory time.
@@ -71,8 +65,27 @@ delta_t = 50
 tau = 5000
 
 #######################################################################################
+############## Advanced parameters you probably don't need to modify ##################
+#######################################################################################
+
+# number of raster points to determine surface area (better be power of 2)
+# mainly affects performance
+num_raster = 512
+
+# radius of solvent used to probe solvent accessible surface area
+sol_s = 1.80
+
+#######################################################################################
 ################## The rest you probably don't need to modify #########################
 #######################################################################################
+
+import numpy as np
+import os.path
+import re
+import math
+import platform
+import scipy.signal as sig
+from scipy import interpolate
 
 def next_2048(x):
     #return 1 if x == 0 else int(2**math.ceil(math.log(x,2)))
