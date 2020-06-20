@@ -197,20 +197,27 @@ average of that run to the static measurement for c, c1 and c2. To do that see n
    script file, and execute it by `./make_input` to copy the .cu/hh files from
    /data/PROT1 to /src .    -->
 
-1. Run `make fit DSET=PROT1` to compile `fit_initial.cu`
+1. Run `make fit DSET=PROT1` to compile `fit_initial.cu`. In doing so an .out
+   file called `fit_initial.out` will be placed in `bin/PROT1/`. 
+   The Makefile reads the `src` and also `data/PROT1` for all relevant source
+   code files.
 
-1. Submit your `fit_initial.sh` that executes `fit_initial.out` to calculate 
-   c1 and c2 that best fit your data. This will also generate the 
-   `scat_param.cu/hh` with the data you provided properly scaled to the 
-   calculated curve. 
+1. Execute `fit_initial.out` to calculate c1 and c2 that best fit your data. 
+   On an HPC this is usually done through a job submission script. Yours may
+   vary. This will also generate the`scat_param.cu/hh` with the data you provided 
+   properly scaled to the calculated curve, in the directory `data/PROT1`.
 
 1. Run `make KCHI=1e-5 DSET=PROT1` to finally compile the `XSMD.cu` 
    to a shared object that NAMD will call every step. 
+   DSET is the name of your dataset.
+   KCHI can be just a string. It does not need to be the actual spring
+   constant. It simply determines where in the `bin` the `XSMD.so` will be
+   placed. The actual spring constant is dictate in the
+   `data/PROT1/env_param.cu`. For example, KCHI can be `20kcal` so you know you
+   are supplying 20 kcal/mol of initial X-ray scattering related potential.
 
-   KCHI is the spring constant that you determine the magnitude of the X-ray
-   scattering potential, and DSET is the name of your dataset.
-
-1. When running NAMD, add these keywords in your NAMD config files.
+1. When running NAMD, add these keywords in your NAMD config files. See the
+   examples for more information.
 ```
     tclForces            on
     set opt              0             # 1 when you are ready to turn it on
@@ -251,18 +258,24 @@ This is the ideal setting and is the typical case of a real application.
    script file, and execute it by `./make_input` to copy the .cu/hh files from
    /data/PROT1 to /src .    -->
 
-1. Run `make fit_traj DSET=PROT1` to compile `fit_traj_initial.cu`
+1. Run `make fit_traj DSET=PROT1` to compile `fit_traj_initial.cu`. This will
+   compile files in `data/PROT1/` and `src` to produce
+   `bin/PROT1/fit_traj_initial.out`.
 
-1. Submit your `fit_traj_initial.sh` that executes `fit_traj_initial.out` to 
-   calculate c, c1 and c2 that best fit your data. This will also generate the 
-   `scat_param.cu/hh` with the data you provided properly scaled to the 
-   calculated curve.
+1. Execute `fit_traj_initial.out` to calculate c1 and c2 that best fit your
+   data using the trajectory as the ground state ensemble.
+   On an HPC this is usually done through a job submission script. Yours may
+   vary. This will also generate the`scat_param.cu/hh` with the data you provided 
+   properly scaled to the calculated curve, in the directory `data/PROT1`.
 
 1. Run `make KCHI=1e-5 DSET=PROT1` to finally compile the `XSMD.cu` 
    to a shared object that NAMD will call every step. 
-
-   KCHI is the spring constant that you determine the magnitude of the X-ray
-   scattering potential, and DSET is the name of your dataset.
+   DSET is the name of your dataset.
+   KCHI can be just a string. It does not need to be the actual spring
+   constant. It simply determines where in the `bin` the `XSMD.so` will be
+   placed. The actual spring constant is dictate in the
+   `data/PROT1/env_param.cu`. For example, KCHI can be `20kcal` so you know you
+   are supplying 20 kcal/mol of initial X-ray scattering related potential.
 
 1. When running NAMD, add these keywords in your NAMD config files.
 ```
