@@ -241,7 +241,13 @@ int main (int argc, char* argv[]) {
 // Calculate scattering for every frame in trajectory
 // argv[1]: name of the file
 // argv[2]: number of frames (2001)
-// argv[3]: using how many frames to fit (500)
+// argv[3]: using how many frames to fit (500) from the end of the trajectory
+// argv[4]: Beginning of c1 range
+// argv[5]: Step of c1 scan
+// argv[6]: Ending of c1 range
+// argv[7]: Beginning of c2 range
+// argv[8]: Step of c2 scan
+// argv[9]: Ending of c2 range
     cudaFree(0);
 
     int frames_total = atoi(argv[2]); // Modify according to your xyz files
@@ -372,16 +378,19 @@ int main (int argc, char* argv[]) {
     float sigma2 = 1.0;
     float alpha = 1.0;
 
-    float c1_init   = 0.995;
+    /*float c1_init   = 0.995;
     float c1_step   = 0.001;
-    float c1_end    = 1.020;
+    float c1_end    = 1.020;*/
+    float c1_init   = atof(argv[4]);
+    float c1_step   = atof(argv[5]);
+    float c1_end    = atof(argv[6]);
     /*float c1_init   = 1.00;
     float c1_step   = 0.002;
     float c1_end    = 1.00;*/
     int c1_step_num = (int)((c1_end - c1_init) / c1_step + 1.0);
-    float c2_init   = 0.8;
-    float c2_step   = 0.05;
-    float c2_end    = 1.4;
+    float c2_init   = atof(argv[7]);
+    float c2_step   = atof(argv[8]);
+    float c2_end    = atof(argv[9]);
     /*float c2_init   = 1.0;
     float c2_step   = 0.1;
     float c2_end    = 1.0;*/
