@@ -53,7 +53,7 @@ qu = 0.7
 rho = 0.334 * 0.98545 # 55.5 deg C density
 
 # k chi - weighing factor. Multiply this with the chi square and you get the 
-# amount of X-ray scattering-derived potential. You can edit this in the 
+# amount of X-ray scattering-derived potential in kcal/mol. You can edit this in the 
 # /data/{YOURSYSTEM}/env_param.cu
 k_chi = 5e-7
 
