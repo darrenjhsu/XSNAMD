@@ -195,10 +195,6 @@ average of that run to the static measurement for c, c1 and c2. To do that see n
 1. Run `python input.py` to parse the PDB and PSF files and generate
    `mol_param.cu/hh` and `coord_ref.cu/hh`
 
-<!--1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
-   script file, and execute it by `./make_input` to copy the .cu/hh files from
-   /data/PROT1 to /src .    -->
-
 1. Run `make fit DSET=PROT1` to compile `fit_initial.cu`. In doing so an .out
    file called `fit_initial.out` will be placed in `bin/PROT1/`. 
    The Makefile reads the `src` and also `data/PROT1` for all relevant source
@@ -256,10 +252,6 @@ This is the ideal setting and is the typical case of a real application.
 1. Export the atomic coordinates of the solute (a.k.a. the atoms you're using
    to calculate the scattering pattern) from the equilibrium run as a
    multiframe xyz file named `trajectory.xyz` to the root folder.
-
-<!--1. Edit the `data_path` variable to PROT1 in `make_input` which is a bash 
-   script file, and execute it by `./make_input` to copy the .cu/hh files from
-   /data/PROT1 to /src .    -->
 
 1. Run `make fit_traj DSET=PROT1` to compile `fit_traj_initial.cu`. This will
    compile files in `data/PROT1/` and `src` to produce
