@@ -230,7 +230,8 @@ if (frame_num % delta_t == 0) {
         d_V_s, 
         num_atom, 
         num_atom2, 
-        d_Ele, 
+        d_Ele,
+        sol_s, 
         d_vdW);
 
     cudaDeviceSynchronize();
