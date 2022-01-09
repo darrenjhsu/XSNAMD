@@ -81,6 +81,6 @@ $(BUILDDIR)/%.o: $(DATA)/%.$(SRCEXT)
 
 clean:
 	@echo " Cleaning..."; 
-	@echo " $(RM) -r $(BUILDDIR) $(TARGET)"; $(RM) -r $(BUILDDIR) $(TARGET)	
+	@echo " $(RM) -r $(BUILDDIR)/*"; $(RM) -r $(BUILDDIR)/*
 	@echo " $(RM) -r $(SRCDIR)/XSMD_wrap.cxx"; $(RM) -r $(SRCDIR)/XSMD_wrap.cxx
 

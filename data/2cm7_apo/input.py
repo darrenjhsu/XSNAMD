@@ -17,49 +17,38 @@ fpdb = data_path + '2cm7_dry.pdb'
 #fpsf = data_path + '1oad_autopsf.psf'
 #fpdb = data_path + '1oad_autopsf.pdb'
 
-# Number of atoms (that you want to include in scattering pattern calculations)
-# This is usually the same as all of your atoms in the pdb file before solvation (minus crystal waters)
+# Number of atoms
 num_atom = 4796
 
 ## Experimental files (file format: q, S_exp [, S_err])
 # One static (S_exp) is required, and many difference can follow.
-# They can also be None, and in this case we will generate files necessary for
-# calculating scattering patterns.
-
-# S_exp_file = data_path + 'S_exp60.txt'
-# dS_exp_file = data_path + 'dS_exp60_full_SADS.txt'
+#S_exp_file = data_path + 'S_exp60.txt'
+#dS_exp_file = data_path + 'dS_exp60_full_SADS.txt'
 S_exp_file = None
 dS_exp_file = None
 
-# Unit of the q vector. If your data is from SASBDB, it is of the unit 1 / nm.
-# If your data is collected at BioCARS it is probably '1 / A'
-# This program works in 1 / A
+# Unit of the q vector. If your data is from SASBDB, it is probably 1 / nm.
+# If your data is collected at BioCARS it is probably 'A'
+# This program works in A
 q_unit = 'A' # Options: 'nm' or 'A'
 
 has_dS = 0   # If the data contains a dS component. 
 alpha = 1    # Excitation fraction. If 10 % of molecule is excited, then alpha = 0.1
 
 # Experimental data has error estimate? (1 or 0)
-has_S_err = 0   # 0 if your S_exp_file contains only [q, S_exp] columns; 1 for [q, S_exp, S_err]
-has_dS_err = 0  # Same concept as above line
+has_S_err = 0
+has_dS_err = 0
 
-# Downsample? (This makes calculation faster as there really aren't that many information channels
-# in the scattering signals. A value of 75 is good for V100 cards, ~56 for P100, and 30~40 for K80.
+# Downsample?
 num_q_down_to = 75 # Apply decimate() to downsample the curve to less than this number of points.
 
 # Upper and lower bound of q
-use_diff_q_range = 0 # Simply use q range from difference file.
-                     # Sometimes data collection and useful difference q range are different.
-                     # E.g. most of the data > 1.2 A^-1 will be noisy and close to zero.
-                     # There's no scientific harm in including them, but calculation will be slower.
-                     # Setting this to 1 overwrites ql and qu below.
+use_diff_q_range = 0 # Simply use q range from difference file; overwrites ql and qu below
                      # It is however useful to set the ql and qu in case of fallback.
-                     # For BioCARS data if the qu is > 1 A^-1 then the program may suffer
+                     # For BioCARS data if the qu is > 1 / A then the program may suffer
                      # from pink beam smearing. Consult BioCARS for more information.
-ql = 0.03            # q, lowest point.
-qu = 6.30            # q, highest point
-                     # If [ql, qu] encompasses data q range, the entire data is included.
-                     # If q vectors from data is outside [ql, qu], those data will be truncated.
+ql = 0.05
+qu = 6.30
 
 # Solvent electron density (rho, for pure water at 20 deg C it is 0.334)
 # Calculate yours separately
@@ -87,9 +76,6 @@ num_raster = 512
 
 # radius of solvent used to probe solvent accessible surface area
 sol_s = 1.80
-
-qs = 0.01            # q, step (Only used when there's no S_exp_file) 
-
 
 #######################################################################################
 ################## The rest you probably don't need to modify #########################
@@ -142,19 +128,19 @@ for x in PSF:
         idx = int(re.search(r'\d+', x).group())
 #        print(idx)
 #        print(x)
-        if x.split()[4] == 'Fe':
-            Ele[idx-1] = 5
-        elif x.split()[4][0] == 'H':
+        if x[24] == 'H':
             Ele[idx-1] = 0
             #print('Hydrogen')
-        elif x.split()[4][0] == 'C':
+        elif x[24] == 'C':
             Ele[idx-1] = 1 
-        elif x.split()[4][0] == 'N':
+        elif x[24] == 'N':
             Ele[idx-1] = 2 
-        elif x.split()[4][0] == 'O':
+        elif x[24] == 'O':
             Ele[idx-1] = 3 
-        elif x.split()[4][0] == 'S':
+        elif x[24] == 'S':
             Ele[idx-1] = 4 
+        elif x[24:26] == 'Fe':
+            Ele[idx-1] = 5
 #        print(Ele[idx-1]) 
         if (idx == NATOM):
             print('Recorded all atoms.')
@@ -188,31 +174,10 @@ print(Ele)
 with open(fpdb) as f:
     PDB = f.readlines()
 
-def parse_PDB(PDB):
-    splitPDB = []
-    for line in PDB:
-        if 'ATOM' in line:
-            splitPDB.append([line[:6].strip(),    # 'ATOM'
-                             line[6:11].strip(),  # index
-                             line[12:16].strip(), # atom name
-                             line[16:20].strip(), # residue name
-                             line[21],            # chain name
-                             line[22:27].strip(), # residue number
-                             line[30:38].strip(), # X
-                             line[38:46].strip(), # Y
-                             line[46:54].strip(), # Z
-                             line[54:60].strip(), # O
-                             line[60:66].strip()]) # B
-            #The rest of the line we don't concern right now
-    return splitPDB
-
-#PDB = [x.strip().split() for x in PDB]
-PDB = parse_PDB(PDB)
+PDB = [x.strip().split() for x in PDB]
 
 ## Read coordinates
-for idx, x in enumerate(PDB):
-    if idx == 0:
-        print(x)
+for x in PDB:
     if x[0] == 'ATOM':
         atoms[int(x[1])-1][:] = x[6:9]
 
@@ -412,7 +377,7 @@ if S_exp_file is not None:
         f.write('extern int has_dS_err;\n')
 
 else: # We're not processing expt data but just generating a file to calculate scattering intensities
-    num_q = int((qu-ql)/qs)+1
+    num_q = int((qu-ql)/0.05)+1
     q = np.linspace(ql, qu, num_q)
     print("Number of q points: {:d}".format(num_q))
     with open(data_path + 'scat_param.cu','w') as f:

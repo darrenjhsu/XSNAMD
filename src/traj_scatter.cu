@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     coord = (float *)malloc(size_coord);
     S_calc = (float *)malloc(size_q);
     S_calc_tot = (float *)malloc(size_q);
-    char* buf[100], buf1[100], buf2[100], buf3[100];
+    char buf[255], buf1[100], buf2[100], buf3[100];
     float f1, f2, f3;
     V = (float *)malloc(size_atom2f);
     // Initialize cuda matrices
@@ -122,15 +122,19 @@ int main(int argc, char* argv[]) {
     // Read file by num_atom
     for (int ii = 0; ii < frames_total; ii++) {
         fscanf(fp,"%*s",buf);
-        fscanf(fp,"%*s %d",buf);
+        fscanf(fp,"%*s %d %*s %*s %*s %*s %*s %*s %*s",buf);
+	//fscanf(fp, "%255[^\n]%c", buf, &endchar);
+        //printf("%s", buf);
         printf("Read the first two lines, ii = %d\n", ii);
         for (int jj = 0; jj < num_atom; jj++) {
             fscanf(fp,"%s %f %f %f",buf, &f1, &f2, &f3);
-            //printf("Readed line %d\n", jj);
             coord[3*jj] = f1;
             coord[3*jj+1] = f2;
             coord[3*jj+2] = f3;
-            //printf("Coord[jj] = %.3f, Coord[jj+1] = %.3f, Coord[jj+2] = %.3f\n",coord[3*jj], coord[3*jj+1], coord[3*jj+2]);
+	    if (jj == 0) {
+                printf("Read line %d\n", jj);
+                printf("Coord[jj] = %.3f, Coord[jj+1] = %.3f, Coord[jj+2] = %.3f\n",coord[3*jj], coord[3*jj+1], coord[3*jj+2]);
+	    }
         }
         printf("First coordinate is: %.3f\n",coord[0]);
         printf("Final coordinate is: %.3f\n",coord[3*num_atom-1]);
@@ -146,15 +150,30 @@ int main(int argc, char* argv[]) {
             cudaMemset(d_close_flag, 0, size_qxatom2);
             cudaMemset(d_close_num, 0, size_atom2);
             cudaMemset(d_close_idx, 0, size_atom2xatom2);
+            cudaDeviceSynchronize();
+            cudaError_t error = cudaGetLastError();
+            if(error!=cudaSuccess)
+            {
+                fprintf(stderr,"ERROR: %s\n", cudaGetErrorString(error) );
+                exit(-1);
+            }
             dist_calc<<<1024, 1024>>>(d_coord, //d_dx, d_dy, d_dz, 
-                                      d_close_num, d_close_flag, d_close_idx, num_atom, num_atom2); 
+                                      d_close_num, d_close_flag, d_close_idx, num_atom, num_atom2);
+            cudaDeviceSynchronize();
+            error = cudaGetLastError();
+            if(error!=cudaSuccess)
+            {
+                fprintf(stderr,"ERROR: %s\n", cudaGetErrorString(error) );
+                exit(-1);
+            }	    
+	    printf("dist_calc done\n");
             surf_calc<<<1024,512>>>(d_coord, d_Ele, d_close_num, d_close_idx, d_vdW, 
                                     num_atom, num_atom2, num_raster, sol_s, d_V);
             // Output V
             cudaMemcpy(V, d_V, size_atom2f, cudaMemcpyDeviceToHost);
             
-            printf("V for frame %5d, ",ii);
-            for (int jj = 0; jj < num_atom; jj++) {
+            printf("V for frame %5d, first ten atoms: ",ii);
+            for (int jj = 0; jj < 10/*num_atom*/; jj++) {
                 printf("%6.3f", V[jj]);
                 if (jj < num_atom - 1) {
                     printf(", ");
@@ -162,7 +181,7 @@ int main(int argc, char* argv[]) {
             }
             printf("\n");
 
-            sum_V<<<1,1024>>>(d_V, d_V_s, num_atom, num_atom2, d_Ele, d_vdW);
+            sum_V<<<1,1024>>>(d_V, d_V_s, num_atom, num_atom2, d_Ele, sol_s, d_vdW);
             FF_calc<<<320, 32>>>(d_q_S_ref_dS, d_WK, d_vdW, num_q, num_ele, c1, r_m, d_FF_table, rho);
             //create_FF_full_HyPred<<<320, 1024>>>(d_FF_table, d_V, c2, d_c2, d_Ele, d_FF_full, 
             //                              num_q, num_ele, num_atom, num_atom2);
