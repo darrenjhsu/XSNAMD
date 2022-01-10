@@ -1,22 +1,23 @@
 
-## Driving an MD structure to another with SAXS signal.
+## Driving an MD structure to another with SAXS / WAXS signal.
 
-Contact: Darren Hsu (darrenhsu2015 at u.northwestern.edu)
+Contact: Darren Hsu (darrenhsu2015 at u.northwestern.edu or hsudj at ornl.gov)
 
 ### Problem statment 
 In time-resolved X-ray solution scattering, researchers
-obtain difference signal as a function of system evolution. In my case, a
-protein assumes different states and gives distinct difference scattering
-signals. We want to find some structures that give the difference signal that
-match the difference signal.
+obtain difference signal as a function of system evolution. 
+In my case, a protein assumes different states and gives distinct difference 
+scattering signals. 
+We want to find some structures that give the difference signal thatmatch 
+the difference signal.
 
 ### What's being done 
-We input the X-ray scattering signal as a
-constraint in the MD simulation. The program calculates X-ray scattering
-signals at each defined snapshot, compare it to the reference signal and calculate the
-difference signal. It then compare the calculated difference signal to the input one, and
-it uses the deviation between them to derive force that acts on each atom. The math is
-described in [our paper](https://doi.org/10.1063/5.0007158). 
+We input the X-ray scattering signal as a constraint in the MD simulation. 
+The program calculates X-ray scattering signals at each defined snapshot, 
+compare it to the reference signal and calculate the difference signal. 
+It then compare the calculated difference signal to the input one, and
+it uses the deviation between them to derive force that acts on each atom. 
+The math is described in [our paper](https://doi.org/10.1063/5.0007158). 
 
 
 ## Why use this program?
@@ -42,7 +43,7 @@ described in [our paper](https://doi.org/10.1063/5.0007158).
 
 This program is written in CUDA C and runs only on Nvidia GPUs. It assumes
 that you have access to an Nvidia GPU. At the time of writing, this code has
-been tested on K40, K80, P100, and Quadro 6000 cards.
+been tested on K40, K80, P100, V100, and Quadro 6000 cards.
 
 ### Software dependencies
 
@@ -63,11 +64,11 @@ inforamtion about installing it locally on your server.
 input C code. You should not need an env for running the provided python script (input.py).
 
 Since the code is intended to be a module of NAMD, **NAMD (CUDA build)** should be 
-installed on your machine. This code is tested with NAMD 2.11.
+installed on your machine. This code is tested with NAMD 2.11 - 2.14.
 You need to know the path to executable `namd2`.
 
 **Note about NAMD 2.12 - 2.14**: It seems that the pre-built binary version
-of NAMD 2.12 - 2.14 (both multicore-CUDA and ibverbs builds) have a different
+of NAMD 2.12 - 2.14 (both multicore-CUDA and ibverbs builds) sometimes have a different
 behavior when its TCL script loads `XSMD.so` which generates errors regarding
 undefined symbols such as `Tcl_GetStringFromObj`. To run on those versions you need
 to compile the NAMD from source code using the TCL library they provide.
@@ -137,7 +138,44 @@ XSNAMD/
 
 ## Application scenarios
 
-### If you have two known structures, and you want to test if the program can drive one structure to another
+### I have a structure and I want to calculate the scattering intensity of it
+
+You will use `input.py` and `traj_scatter.cu`. 
+
+1. Prepare a `myprotein.pdb` file that contains the atoms that you want included in the scattering calculation, in the folder `data/myprotein/`.
+
+1. Edit the `input.py` to point to that file. Set the dS related file pointers to `None`.
+
+1. `make traj DSET=data/myprotein/`. This will generate a `traj_scatter.out` that takes the `.xyz` coordinates and calculate scattering.
+
+1. Convert the `myprotein.pdb` file to an `myprotein.xyz` file. Place in `data/myprotein` (or anywhere you want, really).
+
+1. `./traj_scatter.out data/myprotein/myprotein.xyz 1 > data/myprotein/myprotein.log`
+
+1. Within the log you will find the scattering patterns in `S_calc of frame 0 is ...`.
+
+
+
+### I have a trajectory and I want to calculate the scattering intensity of each frame
+
+
+You will use `input.py` and `traj_scatter.cu`. 
+
+1. Prepare a `myprotein.pdb` file that contains the atoms that you want included in the scattering calculation, in the folder `data/myprotein/`.
+
+1. Edit the `input.py` to point to that file. Set the dS related file pointers to `None`.
+
+1. `make traj DSET=data/myprotein/`. This will generate a `traj_scatter.out` that takes the `.xyz` coordinates and calculate scattering.
+
+1. Convert the `myproteinTrajectory.dcd` trajectory file (not limited to dcd; anything that can be converted to xyz works) to an `myproteinTrajectory.xyz` file, **containing only the atoms you want included in the scattering calculations**. Place in `data/myprotein` (or anywhere you want, really). I usually do this step with `MDAnalysis` but any package would work.
+
+1. `./traj_scatter.out data/myprotein/myproteinTrajectory.xyz [Number of frames] > data/myprotein/myproteinTrajectory.log`
+
+1. Within the log you will find the scattering patterns in `S_calc of frame # is ...`. You can then freely load them for calculations.
+
+
+
+### I have two known structures and I want to test if the program can drive one structure to another
 
 You will calculate the scattering signals from both structures and prepare a mock dataset of q, S\_ref, and dS.
 
@@ -177,7 +215,7 @@ Good for test runs and for understanding how the program works. Refer to the REA
 -->
 
 
-### If you have one known structure, a static measurement, and a difference signal to fit
+### I have one known structure, a static measurement, and a difference signal to fit
 
 It is encouraged that you at least do an equilibrium run for the structure and fit the
 average of that run to the static measurement for c, c1 and c2. To do that see next section.
@@ -233,7 +271,7 @@ average of that run to the static measurement for c, c1 and c2. To do that see n
 During the simulation, look at the log file. It should show the chi square decreasing gradually. 
 
 
-### If you have an equilibrium run of one protein, a static measurement, and a difference signal to fit
+### I have an equilibrium run of one protein, a static measurement, and a difference signal to fit
 
 This is the ideal setting and is the typical case of a real application.
 
@@ -313,6 +351,12 @@ Manuals coming ...
    frame trajectory `mytraj.xyz`, you can use the frames 1000 - 1500 by:
 
    `./fit_traj_initial.out mytraj.xyz 1500 500 0.95 0.01 1.05 0.0 0.1 4.0`
+
+-  `traj_scatter.out` takes 2 arguments (name of the file and frames to 
+   use starting from the last frame). The c1, c2 etc. are gathered from `env_param.cu`.
+   The invocation looks like:
+
+   `./traj_scatter.out mytraj.xyz 1500`
 
 -  `XSMD.so` takes 7 arguments while being called by the XSMD.tcl. They are: 
    (1) an array of coordinates, (2) an array of force, (3) an array of old force (not used),
