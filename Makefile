@@ -53,8 +53,8 @@ test: $(BUILDDIR)/speedtest.o $(TESTPARAMSOBJ) $(DATAPARAMSOBJ) $(SCATPARAMSOBJ)
 	@mkdir -p bin/$(DSET)
 	@echo "Linking for speed test ......"
 	$(CC) $(GSLLIB) $(LIB) $^ -o bin/$(DSET)/speedtest.out
-traj: $(BUILDDIR)/traj_scatter.o $(TRAJPARAMSOBJ) $(DATAPARAMSOBJ) $(SCATPARAMSOBJ)
-	@mkdir -p bin/$(DSET)
+traj: $(BUILDDIR)/traj_scatter.o $(TRAJPARAMSOBJ) 
+	@mkdir -p bin/
 	@echo "Linking for traj to scatter ......"
 	$(CC) $(GSLLIB) $(LIB) $^ -o bin/$(DSET)/traj_scatter.out
 initial: $(BUILDDIR)/structure_calc.o $(DATAPARAMSOBJ)
