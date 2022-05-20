@@ -120,7 +120,6 @@ __global__ void __launch_bounds__(512,4) surf_calc (
     L = sqrt(num_raster * PI);
     for (int ii = blockIdx.x; ii < num_atom; ii += gridDim.x) {
         int atom1t = Ele[ii];
-        if (atom1t > 5) atom1t = 0;
         vdW_s = vdW[atom1t];
         r = vdW_s + sol_s;
         for (int jj = threadIdx.x; jj < num_raster; jj += blockDim.x) {
@@ -143,7 +142,6 @@ __global__ void __launch_bounds__(512,4) surf_calc (
             for (int kk = 0; kk < close_num[ii]; kk++) {
                 int atom2i = close_idx[ii * 1024 + kk];
                 int atom2t = Ele[atom2i];
-                if (atom2t > 5) atom2t = 0;
                 float dx = (x - coord[3*atom2i]);
                 float dy = (y - coord[3*atom2i+1]);
                 float dz = (z - coord[3*atom2i+2]);
@@ -204,7 +202,7 @@ __global__ void sum_V (
 }
 
 __global__ void FF_calc (
-    float *q_S_ref_dS, 
+    float *q, 
     float *WK, 
     float *vdW, 
     int num_q, 
@@ -217,13 +215,13 @@ __global__ void FF_calc (
     // Calculate the non-SASA part of form factors per element
 
     __shared__ float q_pt, q_WK, C1, expC1;
-    __shared__ float FF_pt[7]; // num_ele + 1, the last one for water.
-    __shared__ float vdW_s[7];
-    __shared__ float WK_s[66]; 
+    __shared__ float FF_pt[99]; // num_ele + 1, the last one for water.
+    __shared__ float vdW_s[99];
+    __shared__ float WK_s[1078]; 
     __shared__ float C1_PI_43_rho;
     if (blockIdx.x >= num_q) return; // out of q range
     for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
-        q_pt = q_S_ref_dS[ii];
+        q_pt = q[ii];
         q_WK = q_pt / 4.0 / PI;
         // FoXS C1 term
         expC1 = -powf(4.0 * PI / 3.0, 1.5) * q_WK * q_WK * r_m * r_m * (c1 * c1 - 1.0) / 4.0 / PI;
@@ -239,18 +237,18 @@ __global__ void FF_calc (
             vdW_s[jj] = vdW[jj];
             if (jj == num_ele) {
                 // water
-                FF_pt[jj] = WK_s[3*11+5];
-                FF_pt[jj] += 2.0 * WK_s[5];
-                FF_pt[jj] -= C1_PI_43_rho * powf(vdW_s[jj],3.0) * exp(-PI * vdW_s[jj] * vdW_s[jj] * q_WK * q_WK);
+                FF_pt[jj] = WK_s[7*11+5];  // Oxygen
+                FF_pt[jj] += 2.0 * WK_s[5];  // Hydrogen
+                FF_pt[jj] -= C1_PI_43_rho * powf(vdW_s[jj],3.0) * exp(-PI * powf(4.0/3.0*PI, 2.0/3.0) * vdW_s[jj] * vdW_s[jj] * q_WK * q_WK);  // Water vdW_s
                 for (int kk = 0; kk < 5; kk ++) {
-                    FF_pt[jj] += WK_s[3*11+kk] * exp(-WK_s[3*11+kk+6] * q_WK * q_WK);
-                    FF_pt[jj] += WK_s[kk] * exp(-WK_s[kk+6] * q_WK * q_WK);
-                    FF_pt[jj] += WK_s[kk] * exp(-WK_s[kk+6] * q_WK * q_WK);
+                    FF_pt[jj] += WK_s[7*11+kk] * exp(-WK_s[7*11+kk+6] * q_WK * q_WK); // Oxygen
+                    FF_pt[jj] += WK_s[kk] * exp(-WK_s[kk+6] * q_WK * q_WK) * 2.0; // Hydrogen
                 }
             } else { 
                 FF_pt[jj] = WK_s[jj*11+5];
                 // The part is for excluded volume
-                FF_pt[jj] -= C1_PI_43_rho * powf(vdW_s[jj],3.0) * exp(-PI * vdW_s[jj] * vdW_s[jj] * q_WK * q_WK);
+                FF_pt[jj] -= C1_PI_43_rho * powf(vdW_s[jj],3.0) * exp(-PI * powf(4.0/3.0*PI, 2.0/3.0) * vdW_s[jj] * vdW_s[jj] * q_WK * q_WK);  // Water vdW_s
+                //FF_pt[jj] -= C1_PI_43_rho * powf(vdW_s[jj],3.0) * exp(-PI * vdW_s[jj] * vdW_s[jj] * q_WK * q_WK);
                 for (int kk = 0; kk < 5; kk++) {
                     FF_pt[jj] += WK_s[jj*11+kk] * exp(-WK_s[jj*11+kk+6] * q_WK * q_WK); 
                 }
@@ -274,7 +272,7 @@ __global__ void create_FF_full_FoXS (
 
     // Add on SASA for each atom
 
-    __shared__ float FF_pt[7];
+    __shared__ float FF_pt[99];
     float hydration;
     for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
 
@@ -290,16 +288,10 @@ __global__ void create_FF_full_FoXS (
         hydration = c2 * FF_pt[num_ele];
         
         // Calculate atomic form factor for this q
-        // However to keep compatible to HyPred method we leave atom type def unchanged.
         for (int jj = threadIdx.x; jj < num_atom; jj += blockDim.x) {
             int atomt = Ele[jj];
-            if (atomt > 5) {  // Which means this is a hydrogen
-                FF_full[ii*num_atom2 + jj] = FF_pt[0];
-                FF_full[ii*num_atom2 + jj] += hydration * V[jj];
-            } else {          // Heavy atoms - do the same as before
-                FF_full[ii*num_atom2 + jj] = FF_pt[atomt];
-                FF_full[ii*num_atom2 + jj] += hydration * V[jj];
-            }
+            FF_full[ii*num_atom2 + jj] = FF_pt[atomt];
+            FF_full[ii*num_atom2 + jj] += hydration * V[jj];
         }
     }
 }
@@ -320,9 +312,8 @@ __global__ void __launch_bounds__(1024,2) pure_scat_calc (
 
     for (int ii = blockIdx.x; ii < num_q; ii += gridDim.x) {
 
-        q_pt = q[ii] + 1e-10; // So we don't need a branch for q == 0.0 below
+        q_pt = q[ii];
 
-        // Calculate scattering for Aq
         for (int jj = threadIdx.x; jj < num_atom; jj += blockDim.x) {
             // for every atom jj
             float atom1x = coord[3*jj+0];
@@ -332,13 +323,17 @@ __global__ void __launch_bounds__(1024,2) pure_scat_calc (
             for (int kk = 0; kk < num_atom; kk++) {
                 // for every atom kk
                 float FF_kj = FF_full[ii * num_atom2 + jj] * FF_full[ii *num_atom2 + kk];
-                float dx = atom1x - coord[3*kk+0];
-                float dy = atom1y - coord[3*kk+1];
-                float dz = atom1z - coord[3*kk+2];
-                float r = sqrt(dx*dx+dy*dy+dz*dz) + 1e-10; // avoid r == 0.0
-                float qr = q_pt * r; 
-                float sqr = sin(qr) / qr;
-                S_calccs += FF_kj * sqr;
+                if (q_pt == 0.0 || kk == jj) {
+                    S_calccs += FF_kj;
+                } else {
+                    float dx = atom1x - coord[3*kk+0];
+                    float dy = atom1y - coord[3*kk+1];
+                    float dz = atom1z - coord[3*kk+2];
+                    float r = sqrt(dx*dx+dy*dy+dz*dz);
+                    float qr = q_pt * r; 
+                    float sqr = sin(qr) / qr;
+                    S_calccs += FF_kj * sqr;
+                }
             }
             S_calcc[ii*num_atom2+jj] = S_calccs;
         }

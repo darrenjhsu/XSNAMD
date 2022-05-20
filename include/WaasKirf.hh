@@ -1,3 +1,3 @@
 
-extern float WK[66];
+//extern float WK[66];
 

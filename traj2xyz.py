@@ -17,10 +17,10 @@ if top is None:
 else:
     mol = mdtraj.load(traj, top=top)
 
-Element = [x.element.symbol for x in mol.top.atoms]
+Element = [x.element.atomic_number for x in mol.top.atoms]
 
 with open(xyz, 'w') as f:
     for idx, frame in enumerate(mol.xyz):
-        f.write(f'{len(Element)}\n{idx}\n')
+        f.write(f'{len(Element)}\nframe {idx}\n')
         for ele, coor in zip(Element, frame):
-            f.write(f'{ele} {coor[0]} {coor[1]} {coor[2]}\n')
+            f.write(f'{ele} {coor[0]*10:.3f} {coor[1]*10:.3f} {coor[2]*10:.3f}\n')
