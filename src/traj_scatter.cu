@@ -68,7 +68,9 @@ int main(int argc, char* argv[]) {
     }
 
     fscanf(fp,"%d",&num_atom);
-    fscanf(fp,"%*s %d",buf, &buf_d);
+    fscanf(fp,"%d %s",&buf_d, buf);
+
+    int num_frames = buf_d;
     
 
     int num_atom2 = (num_atom + 2047) / 2048 * 2048;
@@ -154,9 +156,9 @@ int main(int argc, char* argv[]) {
 
     // Read file by num_atom
     fp = fopen(argv[1],"r");
-    for (int ii = 0; ii < 1; ii++) {
+    for (int ii = 0; ii < num_frames; ii++) {
         fscanf(fp,"%*s",buf);
-        fscanf(fp,"%*s %d",buf, &buf_d);
+        fscanf(fp,"%d %*s",&buf_d, buf);
         //printf("Read the first two lines, ii = %d\n", ii);
         for (int jj = 0; jj < num_atom; jj++) {
             fscanf(fp,"%s %f %f %f",buf, &f1, &f2, &f3);
